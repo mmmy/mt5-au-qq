@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>TradingView 警报管理</title>
+    <link rel="stylesheet" href="/static/style.css">
+  </head>
+  <body>
+    <main class="page-shell">
+      <header class="page-header">
+        <div>
+          <p class="eyebrow">MT5 · XAUUSD</p>
+          <h1>TradingView 警报管理</h1>
+          <p class="subtitle">创建、查看和删除黄金价格策略警报</p>
+        </div>
+        <button id="refreshButton" class="button button-secondary" type="button">刷新列表</button>
+      </header>
+
+      <section class="panel trading-panel" aria-labelledby="tradingTitle">
+        <div class="panel-heading trading-heading">
+          <div>
+            <h2 id="tradingTitle">MT5 交易控制</h2>
+            <p>仅管理 magic number 属于本程序的 XAUUSD 仓位。</p>
+          </div>
+        </div>
+
+        <div class="status-grid">
+          <div class="status-card program-trading-card">
+            <div>
+              <span>程序交易</span>
+              <strong id="tradingEnabledStatus">读取中</strong>
+            </div>
+            <label class="switch" title="启用或停止程序交易">
+              <input id="tradingToggle" type="checkbox" role="switch" aria-label="程序交易" disabled>
+              <span class="switch-slider" aria-hidden="true"></span>
+            </label>
+          </div>
+          <div class="status-card">
+            <span>MT5 连接</span>
+            <strong id="mt5ConnectionStatus">读取中</strong>
+          </div>
+          <div class="status-card">
+            <span>算法交易</span>
+            <strong id="algoTradingStatus">读取中</strong>
+          </div>
+          <div class="status-card">
+            <span>账户</span>
+            <strong id="accountStatus">读取中</strong>
+          </div>
+          <div class="status-card">
+            <span>XAUUSD 报价</span>
+            <strong id="quoteStatus">读取中</strong>
+          </div>
+          <div class="status-card">
+            <span>程序持仓</span>
+            <strong id="positionStatus">读取中</strong>
+          </div>
+        </div>
+
+        <div class="webhook-box">
+          <div>
+            <span>本机 TradingView Webhook URL</span>
+            <code id="webhookUrl">读取中……</code>
+          </div>
+          <button id="copyWebhookButton" class="button button-secondary" type="button">复制</button>
+        </div>
+
+        <div class="manual-actions" aria-label="MT5 手动平仓操作">
+          <button class="button action-button" type="button" data-trade-action="close_long">平多</button>
+          <button class="button action-button" type="button" data-trade-action="close_short">平空</button>
+        </div>
+        <p class="form-help trading-help" id="tradingHelp">程序重启后默认停止交易，必须手动启用。</p>
+      </section>
+
+      <section class="panel create-panel" aria-labelledby="createTitle">
+        <div class="panel-heading">
+          <div>
+            <h2 id="createTitle">创建警报</h2>
+            <p>输入 1～6 个价格，使用空格分隔。</p>
+          </div>
+        </div>
+        <form id="createForm" class="create-form">
+          <label for="prices">价格</label>
+          <div class="input-row">
+            <input
+              id="prices"
+              name="prices"
+              type="text"
+              inputmode="decimal"
+              autocomplete="off"
+              placeholder="例如：4600 4620.5 4660"
+              maxlength="200"
+              required
+            >
+            <button id="createButton" class="button button-primary" type="submit">创建警报</button>
+          </div>
+          <p class="form-help">价格必须大于 0，不能重复；策略最多支持六个价格。</p>
+        </form>
+      </section>
+
+      <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+
+      <section class="panel" aria-labelledby="listTitle">
+        <div class="panel-heading list-heading">
+          <div>
+            <h2 id="listTitle">当前警报</h2>
+            <p id="listSummary">正在加载……</p>
+          </div>
+          <span id="loadingIndicator" class="loading-indicator" hidden>同步中</span>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>状态</th>
+                <th>名称</th>
+                <th>品种</th>
+                <th>周期</th>
+                <th>创建时间</th>
+                <th>最后触发</th>
+                <th class="actions-column">操作</th>
+              </tr>
+            </thead>
+            <tbody id="alertTableBody"></tbody>
+          </table>
+          <div id="emptyState" class="empty-state" hidden>
+            <p>还没有本项目创建的警报。</p>
+            <span>在上方输入价格即可创建。</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="signalTitle">
+        <div class="panel-heading list-heading">
+          <div>
+            <h2 id="signalTitle">交易信号记录</h2>
+            <p id="signalSummary">正在加载……</p>
+          </div>
+          <button id="clearSignalsButton" class="button button-secondary" type="button">清除记录</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>接收时间</th>
+                <th>来源</th>
+                <th>动作</th>
+                <th>状态</th>
+                <th>品种</th>
+                <th>结果</th>
+              </tr>
+            </thead>
+            <tbody id="signalTableBody"></tbody>
+          </table>
+          <div id="signalEmptyState" class="empty-state" hidden>
+            <p>还没有交易信号。</p>
+            <span>Webhook 或手动测试信号会显示在这里。</span>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script src="/static/app.js" defer></script>
+  </body>
+</html>

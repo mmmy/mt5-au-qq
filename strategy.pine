@@ -1,0 +1,316 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © gouge99
+
+//@version=6
+strategy("黄金价格策略", overlay=true, fill_orders_on_standard_ohlc = true)
+
+strategySide = input.string(defval = '自动', title = '开仓方向', options = ['看多', '看空', '自动'], tooltip = '', inline = 'open side')
+openLastBars = input.int(defval = 20, title = '有效(K线数)', tooltip = '从开始时间算起的K线数量', inline = 'open side')
+startTime = input.time(defval = 0, title = '开始时间', confirm = true, inline = 'base config')
+posSize = input.float(1, title = '仓位大小')
+
+enablePrice1 = input.bool(true, title = '开启', inline = 'price1')
+price1 = input.price(4580, title = '价格1', inline = "price1")
+p1Color = input.color(color.blue, title = '', inline = "price1")
+
+enablePrice2 = input.bool(true, title = '开启', inline = 'price2')
+price2 = input.price(4600, title = '价格2', inline = "price2")
+p2Color = input.color(color.blue, title = '', inline = "price2")
+
+enablePrice3 = input.bool(true, title = '开启', inline = 'price3')
+price3 = input.price(4630, title = '价格3', inline = "price3")
+p3Color = input.color(color.blue, title = '', inline = "price3")
+
+enablePrice4 = input.bool(true, title = '开启', inline = 'price4')
+price4 = input.price(4660, title = '价格4', inline = "price4")
+p4Color = input.color(color.blue, title = '', inline = "price4")
+
+enablePrice5 = input.bool(true, title = '开启', inline = 'price5')
+price5 = input.price(0, title = '价格5', inline = "price5")
+p5Color = input.color(color.blue, title = '', inline = "price5")
+
+enablePrice6 = input.bool(true, title = '开启', inline = 'price6')
+price6 = input.price(0, title = '价格6', inline = "price6")
+p6Color = input.color(color.blue, title = '', inline = "price6")
+
+priceDelta = input.float(2, title = '入场价格区间偏离', minval = 0)
+
+fraGroup = '分型'
+enableFractal = input.bool(true, title = '启用', group = fraGroup)
+showFractal = input.bool(false, title = '显示分型信号', group = fraGroup)
+
+pinbarGroup = 'pinbar'
+enablePinbar = input.bool(true, title = '启用', group = pinbarGroup)
+showPinbar = input.bool(false, title = "显示pinbar信号", group = pinbarGroup)
+
+insidebarGroup = 'insidebar'
+enableInsideBar = input.bool(true, title = '启用', group = insidebarGroup)
+showInsidebar = input.bool(false, title = "显示insidebar信号", group = insidebarGroup)
+
+longSideOn = strategySide == '看多' or strategySide == '自动'
+shortSideOn = strategySide == '看空' or strategySide == '自动'
+
+timeStartfilter = time_close > startTime
+minPeriodSec = timeframe.in_seconds(timeframe.period)
+
+openEndTime = startTime + math.round(openLastBars * minPeriodSec * 1000)
+timeEndFilter = time <= openEndTime
+timeFilter = timeStartfilter and timeEndFilter
+
+// 记录所有开启且大于0的价格
+var prices = array.new<float>()
+
+var line line1 = na
+if enablePrice1 and na(line1) and price1 > 0
+    line1 := line.new(startTime, price1, openEndTime, price1, xloc.bar_time, color = p1Color, width = 2)
+    prices.push(price1)
+
+var line line2 = na
+if enablePrice2 and na(line2) and price2 > 0
+    line2 := line.new(startTime, price2, openEndTime, price2, xloc.bar_time, color = p2Color, width = 2)
+    prices.push(price2)
+
+var line line3 = na
+if enablePrice3 and na(line3) and price3 > 0
+    line3 := line.new(startTime, price3, openEndTime, price3, xloc.bar_time, color = p3Color, width = 2)
+    prices.push(price3)
+
+var line line4 = na
+if enablePrice4 and na(line4) and price4 > 0
+    line4 := line.new(startTime, price4, openEndTime, price4, xloc.bar_time, color = p4Color, width = 2)
+    prices.push(price4)
+
+var line line5 = na
+if enablePrice5 and na(line5) and price5 > 0
+    line5 := line.new(startTime, price5, openEndTime, price5, xloc.bar_time, color = p5Color, width = 2)
+    prices.push(price5)
+
+var line line6 = na
+if enablePrice6 and na(line6) and price6 > 0
+    line6 := line.new(startTime, price6, openEndTime, price6, xloc.bar_time, color = p6Color, width = 2)
+    prices.push(price6)
+// 将价格从小到大排列
+array.sort(prices, order.ascending)
+
+bodyHight = math.abs(close - open)
+longBarPriceFilter = open + bodyHight * 0.33333
+shortBarPriceFilter = open - bodyHight * 0.33333
+isLongBar = close > open
+// 看涨k 记录实体上破2/3位置的价格,否则纪录下破2/3位置的价格
+priceFilter = isLongBar ? longBarPriceFilter : shortBarPriceFilter
+
+[isLongBar30_0, priceFilter30_0, isLongBar30_1, priceFilter30_1, timeClose30] = request.security('', '30', [isLongBar, priceFilter, isLongBar[1], priceFilter[1], time_close], lookahead = barmerge.lookahead_on)
+// 使用已经收盘的30分钟数据
+isLongBar30 = isLongBar30_1
+priceFilter30 = priceFilter30_1
+
+// plot(priceFilter30, color = isLongBar30 ? color.green : color.red)
+
+[isLongBar15_1, priceFilter15_1] = request.security('', '15', [isLongBar[1], priceFilter[1]], lookahead = barmerge.lookahead_on)
+// plot(priceFilter15_1, color = isLongBar15_1 ? color.green : color.red)
+longPriceIndex = -1
+longPrice = 0.0
+shortPriceIndex = -1
+shortPrice = 0.0
+for [index, value] in prices
+    if timeFilter
+        if priceFilter30_1 >= value and priceFilter15_1 >= value
+            longPriceIndex := index
+            longPrice := value
+        if shortPrice <= 0 and priceFilter30_1 <= value and priceFilter15_1 <= value
+            shortPriceIndex := index
+            shortPrice := value
+
+// 计算看多和看空的价格区间
+float longPriceMin = na
+float longPriceMax = na
+float shortPriceMin = na
+float shortPriceMax = na
+
+if longPrice != shortPrice
+    if longPrice > 0
+        longPriceMin := longPrice - priceDelta
+        longPriceMax := longPrice + priceDelta
+    if shortPrice > 0
+        shortPriceMin := shortPrice - priceDelta
+        shortPriceMax := shortPrice + priceDelta
+
+lp1 = plot(longPriceMin, display = display.none)
+lp2 = plot(longPriceMax, display = display.none)
+fill(lp1, lp2, color=color.new(color.green, 80))
+
+sp1 = plot(shortPriceMin, display = display.none)
+sp2 = plot(shortPriceMax, display = display.none)
+fill(sp1, sp2, color=color.new(color.red, 80))
+
+// plot(longPrice > 0 ? longPrice : na, color=color.green)
+// plot(shortPrice > 0 ? shortPrice : na, color=color.red)
+
+// body = math.abs(open - close)
+// isUp = close > open
+// isDown = close < open
+
+// donwLV = body < body[1] and body[1] < body[2] and isDown and isDown[1] and isDown[2]
+// upLV = body < body[1] and body[1] < body[2] and isUp and isUp[1] and isUp[2]
+
+// // bgcolor(donwLV ? color.new(color.red, 90) : na)
+// // bgcolor(upLV ? color.new(color.green, 90) : na)
+
+// longCondition = donwLV and low > price1 and low - price1 < 2
+// if (longCondition)
+//     strategy.entry("long", strategy.long)
+
+// shortCondition = upLV and high < price2 and price2 - high < 2
+// if (shortCondition)
+//     strategy.close("long")
+
+// 顶底分型
+fractalTop = high[1] > high[2] and low[1] > low[2] and high < high[1] and low < low[1] and close < open
+fractalBottom = high[1] < high[2] and low[1] < low[2] and high > high[1] and low > low[1] and close > open
+bgcolor(showFractal and fractalTop ? color.new(color.red, 70) : na)
+bgcolor(showFractal and fractalBottom ? color.new(color.green, 70) : na)
+
+bodyUpper = math.max(close, open)
+bodyLower = math.min(close, open)
+totalRange = high - low
+upperShadow = high - bodyUpper
+lowerShadow = bodyLower - low
+// 上下影线占用的比例
+upperShadowRatio = totalRange == 0 ? 0 : upperShadow / totalRange
+lowerShadowRatio = totalRange == 0 ? 0 : lowerShadow / totalRange
+//pinbar, 需要同时有上下影线
+pinbarUp = upperShadowRatio > 0 and upperShadowRatio < 0.1 and lowerShadowRatio > 0.6
+pinbarDown = lowerShadowRatio > 0 and lowerShadowRatio < 0.1 and upperShadowRatio > 0.6
+bgcolor(showPinbar and pinbarUp ? color.new(color.green, 70) : na)
+bgcolor(showPinbar and pinbarDown ? color.new(color.red, 70) : na)
+
+pinbarMore = upperShadow < 0.1 and lowerShadowRatio > 0.5
+
+insideBar = high[1] <= high[2] and low[1] >= low[2] and bodyUpper[1] <= bodyUpper[2] and bodyLower[1] >= bodyLower[2]
+//insidebar, 内含k线然后突破
+bullishInsideBar = insideBar and close > bodyUpper[2]
+bearishInsideBar = insideBar and close < bodyLower[2]
+bgcolor(showInsidebar and bullishInsideBar ? color.new(color.green, 70) : na)
+bgcolor(showInsidebar and bearishInsideBar ? color.new(color.red, 70) : na)
+
+[fractalTop_5m, fractalBottom_5m, pinbarUp_5m, pinbarDown_5m, bullishInsideBar_5m, bearishInsideBar_5m] = request.security('', '5', [fractalTop, fractalBottom, pinbarUp, pinbarDown, bullishInsideBar, bearishInsideBar], lookahead = barmerge.lookahead_on)
+
+isInLongPirce = low > longPriceMin and low < longPriceMax
+isInShortPrice = high < shortPriceMax and high > shortPriceMin
+
+fractalBottomSignal = enableFractal and fractalBottom
+fractalTopSignal = enableFractal and fractalTop
+
+pinbarUpSignal = enablePinbar and pinbarUp
+pinbarDownSignal = enablePinbar and pinbarDown
+
+bullishInsideBarSignal = enableInsideBar and bullishInsideBar
+bearishInsideBarSignal = enableInsideBar and bearishInsideBar
+
+longMsg1 = '5m'
+if enableFractal and fractalBottom_5m
+    longMsg1 += '底分型'
+else if enablePinbar and pinbarUp_5m
+    longMsg1 += 'PB'
+else if enableInsideBar and bullishInsideBar_5m
+    longMsg1 += 'IB'
+
+longMsg2 = str.tostring(timeframe.period)
+if enableFractal and fractalBottom
+    longMsg2 += '底分型'
+else if enablePinbar and pinbarUp
+    longMsg2 += 'PB'
+else if enableInsideBar and bullishInsideBar
+    longMsg2 += 'IB'
+
+shortMsg1 = '5'
+if enableFractal and fractalTop_5m
+    shortMsg1 += '顶分型'
+else if enablePinbar and pinbarDown_5m
+    shortMsg1 += 'PB'
+else if enableInsideBar and bearishInsideBar_5m
+    shortMsg1 += 'IB'
+
+shortMsg2 = str.tostring(timeframe.period)
+if enableFractal and fractalTop
+    shortMsg2 += '顶分型'
+else if enablePinbar and pinbarDown
+    shortMsg2 += 'PB'
+else if enableInsideBar and bearishInsideBar
+    shortMsg2 += 'IB'
+
+longSignal = (longSideOn and isInLongPirce and
+     ((enableFractal and fractalBottom_5m) or (enablePinbar and pinbarUp_5m) or (enableInsideBar and bullishInsideBar_5m)) and
+     (fractalBottomSignal or pinbarUpSignal or bullishInsideBarSignal))
+
+shortSignal = (shortSideOn and isInShortPrice and
+     ((enableFractal and fractalTop_5m) or (enablePinbar and pinbarDown_5m) or (enableInsideBar and bearishInsideBar_5m)) and
+     (fractalTopSignal or pinbarDownSignal or bearishInsideBarSignal))
+
+hasLongPos = strategy.position_size > 0
+hasShortPos = strategy.position_size < 0
+posAbs = math.abs(strategy.position_size)
+
+lastEntryComment = strategy.opentrades.entry_comment(strategy.opentrades - 1)
+lastCloseComment = strategy.closedtrades.exit_comment(strategy.closedtrades - 1)
+
+barsSinceLastEntry() =>
+    strategy.opentrades > 0 ? bar_index - strategy.opentrades.entry_bar_index(strategy.opentrades - 1) : na
+
+barsSinceLastClose() =>
+    strategy.closedtrades > 0 ? bar_index - strategy.closedtrades.exit_bar_index(strategy.closedtrades - 1) : na
+
+bsLastEntry = barsSinceLastEntry()
+
+varip float longStopPrice = na // 多头保护性止损价格
+varip float shortStopPrice = na // 空头保护性止损价格
+varip float longTargetPrice = na // 多头止盈价格
+varip float shortTargetPrice = na // 空头止盈价格
+closeLong = false
+closeShort = false
+
+if not hasLongPos
+    longStopPrice := na
+    longTargetPrice := na
+
+if  not hasShortPos
+    shortStopPrice := na
+    shortTargetPrice := na
+
+var stopLossMsg = '__STOPLOSS'
+longStopCondition = ta.crossunder(low, longStopPrice)
+shortStopCondition = ta.crossover(high, shortStopPrice)
+
+hh = ta.highest(high, 3)
+ll = ta.lowest(low, 3)
+
+//触发止损
+if longStopCondition
+    if hasLongPos
+        strategy.close('long', comment = '损', alert_message = stopLossMsg)
+if shortStopCondition
+    if hasShortPos
+        strategy.close('short', comment = '损', alert_message = stopLossMsg)
+
+if longSideOn and hasLongPos
+    if longTargetPrice > 0 and high >= longTargetPrice
+        reduceMsg = '多头止盈'
+        strategy.close('long', comment = reduceMsg, qty = posSize)
+
+if shortSideOn and hasShortPos
+    if shortTargetPrice > 0 and low <= shortTargetPrice
+        reduceMsg = '空头止盈'
+        strategy.close('short', comment = reduceMsg, qty = posSize)
+
+if barstate.isconfirmed
+    if longSideOn and not hasLongPos and longSignal
+        openMsg = str.format('{0}-{1}', longMsg1, longMsg2)
+        strategy.order(id = 'long', qty = posSize, direction = strategy.long, comment = str.format('开仓:{0}', openMsg), alert_message = openMsg, oca_name = 'new', oca_type = strategy.oca.cancel)
+        longStopPrice := math.min(close - 3, ll)
+        longTargetPrice := shortPriceMin
+
+    if shortSideOn and not hasShortPos and shortSignal
+        openMsg = str.format('{0}-{1}', shortMsg1, shortMsg2)
+        strategy.order(id = 'short', qty = posSize, direction = strategy.short, comment = str.format('开仓:{0}', openMsg), alert_message = openMsg, oca_name = 'new', oca_type = strategy.oca.cancel)
+        shortStopPrice := math.max(close + 3, hh)
+        shortTargetPrice := longPriceMax
