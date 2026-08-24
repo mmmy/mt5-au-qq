@@ -19,6 +19,14 @@ PRICE_INPUTS: tuple[tuple[str, str], ...] = (
     ("in_19", "in_20"),
 )
 DECIMAL_PATTERN = re.compile(r"\d+(?:\.\d+)?\Z")
+REQUIRED_WEBHOOK_PLACEHOLDERS = {
+    "side": "{{strategy.order.action}}",
+    "marketPosition": "{{strategy.market_position}}",
+    "prevMarketPosition": "{{strategy.prev_market_position}}",
+    "symbol": "{{ticker}}",
+    "timestamp": "{{timenow}}",
+    "id": "{{strategy.order.id}}",
+}
 
 
 def parse_prices(raw_prices: str) -> list[Decimal]:
@@ -95,6 +103,25 @@ class AlertTemplateBuilder:
             payload["web_hook"] = webhook_url
         self._update_start_time(payload, inputs, now_ms=now_ms)
         return template
+
+    def webhook_message(self) -> str:
+        template = self._load_template()
+        payload = template.get("payload")
+        if not isinstance(payload, dict):
+            raise TemplateError("payload.json 缺少 payload 对象")
+        raw_message = payload.get("message")
+        if not isinstance(raw_message, str) or not raw_message.strip():
+            raise TemplateError("payload.json 缺少 TradingView 警报消息")
+        try:
+            message = json.loads(raw_message)
+        except json.JSONDecodeError as exc:
+            raise TemplateError("TradingView 警报消息不是有效 JSON") from exc
+        if not isinstance(message, dict):
+            raise TemplateError("TradingView 警报消息必须是 JSON 对象")
+        invalid = [key for key, placeholder in REQUIRED_WEBHOOK_PLACEHOLDERS.items() if message.get(key) != placeholder]
+        if invalid:
+            raise TemplateError("TradingView 警报消息缺少必要占位符：" + ", ".join(invalid))
+        return json.dumps(message, ensure_ascii=False, indent=2)
 
     def _load_template(self) -> dict[str, Any]:
         try:

@@ -131,6 +131,11 @@ class TradingRuntimeStatus(BaseModel):
     mt5: Mt5Status
 
 
+class TradingViewSetupResponse(BaseModel):
+    webhook_url: str
+    message: str
+
+
 class TradingToggleResponse(BaseModel):
     enabled: bool
     message: str

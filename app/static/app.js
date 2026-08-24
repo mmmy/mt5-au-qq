@@ -19,6 +19,8 @@ const elements = {
   positionStatus: document.querySelector("#positionStatus"),
   webhookUrl: document.querySelector("#webhookUrl"),
   copyWebhookButton: document.querySelector("#copyWebhookButton"),
+  webhookMessage: document.querySelector("#webhookMessage"),
+  copyWebhookMessageButton: document.querySelector("#copyWebhookMessageButton"),
   manualActionButtons: [...document.querySelectorAll("[data-trade-action]")],
   tradingHelp: document.querySelector("#tradingHelp"),
   signalTableBody: document.querySelector("#signalTableBody"),
@@ -144,6 +146,17 @@ function signalStatusLabel(status) {
     expired: "已过期",
     ignored: "已忽略",
   }[status] || status;
+}
+
+async function loadTradingViewSetup() {
+  try {
+    const data = await apiRequest("/api/tradingview/setup");
+    elements.webhookUrl.textContent = data.webhook_url || `${window.location.origin}/api/webhooks/tradingview`;
+    elements.webhookMessage.value = data.message;
+  } catch (error) {
+    elements.webhookMessage.value = "读取 TradingView 配置失败";
+    showNotice(error.message, "error");
+  }
 }
 
 async function loadTradingStatus() {
@@ -362,7 +375,7 @@ async function submitManualAction(button) {
 }
 
 async function refreshDashboard() {
-  await Promise.all([loadAlerts({ quiet: true }), loadTradingStatus(), loadSignals()]);
+  await Promise.all([loadAlerts({ quiet: true }), loadTradingStatus(), loadTradingViewSetup(), loadSignals()]);
 }
 
 elements.form.addEventListener("submit", createAlert);
@@ -377,6 +390,14 @@ elements.copyWebhookButton.addEventListener("click", async () => {
     showNotice("Webhook URL 已复制");
   } catch (_error) {
     showNotice("无法自动复制，请手动选择 URL", "error");
+  }
+});
+elements.copyWebhookMessageButton.addEventListener("click", async () => {
+  try {
+    await copyText(elements.webhookMessage.value);
+    showNotice("警报消息 JSON 已复制");
+  } catch (_error) {
+    showNotice("无法自动复制，请手动选择消息 JSON", "error");
   }
 });
 elements.clearSignalsButton.addEventListener("click", clearSignals);

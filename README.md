@@ -77,6 +77,7 @@ POST   /api/alerts
 DELETE /api/alerts/{alert_id}
 GET    /api/health
 POST   /api/webhooks/tradingview
+GET    /api/tradingview/setup
 GET    /api/trading/status
 POST   /api/trading/enable
 POST   /api/trading/disable
@@ -99,6 +100,8 @@ GET    /api/trade-orders
 ```
 
 TradingView webhook 根据 `prevMarketPosition` 和 `marketPosition` 判断操作。相同 webhook 会通过信号哈希去重，不会重复下单。当前本机开发阶段按需求暂不校验 `signalToken`，部署到公网前必须增加鉴权。
+
+管理页面会显示可复制的 webhook URL 和警报消息 JSON。两者也可以通过 `GET /api/tradingview/setup` 获取；消息来自 `payload.json` 的 `payload.message`，后端会校验必要的 TradingView 占位符。
 
 未配置 `TRADINGVIEW_WEBHOOK_URL` 时，程序会根据浏览器访问页面时使用的协议和 Host 自动生成 URL。例如通过 `https://trade.example.com` 打开页面时，会生成 `https://trade.example.com/api/webhooks/tradingview`。如果通过 `127.0.0.1` 打开，生成的仍会是 `127.0.0.1`。反向代理需要保留原始 `Host`，并正确传递 HTTPS 协议信息。
 

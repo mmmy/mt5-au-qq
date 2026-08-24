@@ -66,6 +66,14 @@
           <button id="copyWebhookButton" class="button button-secondary" type="button">复制</button>
         </div>
 
+        <div class="webhook-box webhook-message-box">
+          <div class="webhook-message-content">
+            <span>TradingView 警报消息 JSON</span>
+            <textarea id="webhookMessage" readonly spellcheck="false" aria-label="TradingView 警报消息 JSON">读取中……</textarea>
+          </div>
+          <button id="copyWebhookMessageButton" class="button button-secondary" type="button">复制 JSON</button>
+        </div>
+
         <div class="manual-actions" aria-label="MT5 手动平仓操作">
           <button class="button action-button" type="button" data-trade-action="close_long">平多</button>
           <button class="button action-button" type="button" data-trade-action="close_short">平空</button>

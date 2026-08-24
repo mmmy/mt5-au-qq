@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from app.alert_template import AlertTemplateBuilder, parse_prices
-from app.errors import ValidationError
+from app.errors import TemplateError, ValidationError
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -64,3 +64,24 @@ def test_builder_replaces_prices_switches_name_and_start_time() -> None:
     assert result["payload"]["web_hook"] == "http://127.0.0.1:8000/api/webhooks/tradingview"
     assert (ROOT / "payload.json").read_text(encoding="utf-8") == source_before
     json.dumps(result)
+
+
+def test_webhook_message_is_valid_and_contains_required_placeholders() -> None:
+    builder = AlertTemplateBuilder(ROOT / "payload.json")
+
+    message = json.loads(builder.webhook_message())
+
+    assert message["side"] == "{{strategy.order.action}}"
+    assert message["marketPosition"] == "{{strategy.market_position}}"
+    assert message["prevMarketPosition"] == "{{strategy.prev_market_position}}"
+    assert message["symbol"] == "{{ticker}}"
+    assert message["timestamp"] == "{{timenow}}"
+    assert message["id"] == "{{strategy.order.id}}"
+
+
+def test_webhook_message_rejects_missing_placeholders(tmp_path: Path) -> None:
+    payload_file = tmp_path / "payload.json"
+    payload_file.write_text(json.dumps({"payload": {"message": "{}"}}), encoding="utf-8")
+
+    with pytest.raises(TemplateError, match="必要占位符"):
+        AlertTemplateBuilder(payload_file).webhook_message()

@@ -249,6 +249,30 @@ h2 {
   white-space: nowrap;
 }
 
+.webhook-message-box {
+  align-items: flex-start;
+}
+
+.webhook-message-content {
+  width: 100%;
+}
+
+.webhook-message-content textarea {
+  width: 100%;
+  min-height: 260px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  outline: none;
+  resize: vertical;
+  background: var(--bg);
+  color: var(--accent-hover);
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 13px;
+  line-height: 1.55;
+  white-space: pre;
+}
+
 .manual-actions {
   padding: 0 24px;
 }

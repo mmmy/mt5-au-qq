@@ -23,6 +23,7 @@ from app.models import (
     TradeAction,
     TradingRuntimeStatus,
     TradingToggleResponse,
+    TradingViewSetupResponse,
     TradingViewWebhook,
     WebhookResponse,
 )
@@ -49,9 +50,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             origin=app_settings.tradingview_origin,
             timeout_seconds=app_settings.request_timeout_seconds,
         )
+        template_builder = AlertTemplateBuilder(app_settings.payload_file)
+        app.state.alert_template_builder = template_builder
         app.state.alert_service = AlertService(
             client,
-            AlertTemplateBuilder(app_settings.payload_file),
+            template_builder,
             name_prefix=app_settings.alert_name_prefix,
             webhook_url=app_settings.local_webhook_url,
         )
@@ -127,6 +130,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     async def tradingview_webhook(data: TradingViewWebhook, request: Request) -> WebhookResponse:
         return request.app.state.trading_service.ingest_webhook(data)
+
+    @app.get("/api/tradingview/setup", response_model=TradingViewSetupResponse)
+    async def tradingview_setup(request: Request) -> TradingViewSetupResponse:
+        webhook_url = resolve_webhook_url(request, request.app.state.settings.local_webhook_url)
+        message = request.app.state.alert_template_builder.webhook_message()
+        return TradingViewSetupResponse(webhook_url=webhook_url, message=message)
 
     @app.get("/api/trading/status", response_model=TradingRuntimeStatus)
     async def trading_status(request: Request) -> TradingRuntimeStatus:
