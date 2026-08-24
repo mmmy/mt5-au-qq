@@ -6,7 +6,6 @@ const elements = {
   alertSide: document.querySelector("#alertSide"),
   alertResolution: document.querySelector("#alertResolution"),
   validBars: document.querySelector("#validBars"),
-  alertStartTime: document.querySelector("#alertStartTime"),
   alertEndTime: document.querySelector("#alertEndTime"),
   createButton: document.querySelector("#createButton"),
   refreshButton: document.querySelector("#refreshButton"),
@@ -35,7 +34,6 @@ const elements = {
 };
 let pendingCreate = null;
 let validBarsEdited = false;
-let startTimeEdited = false;
 const resolutionMinutes = {
   "1": 1,
   "2": 2,
@@ -128,13 +126,8 @@ function formatDate(value) {
   }).format(date);
 }
 
-function toDateTimeLocalValue(date) {
-  const offsetMs = date.getTimezoneOffset() * 60_000;
-  return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
-}
-
 function updateAlertEndTime() {
-  const startMs = new Date(elements.alertStartTime.value).getTime();
+  const startMs = Date.now();
   const bars = Number(elements.validBars.value);
   const minutes = resolutionMinutes[elements.alertResolution.value];
   if (!Number.isFinite(startMs) || !Number.isInteger(bars) || bars < 1 || !minutes) {
@@ -151,7 +144,6 @@ function applyOneDayBarDefault() {
 }
 
 function initializeAlertForm() {
-  elements.alertStartTime.value = toDateTimeLocalValue(new Date());
   applyOneDayBarDefault();
 }
 
@@ -303,7 +295,6 @@ function renderAlerts(alerts) {
       row,
       alert.resolution ? `${alert.resolution} 分钟${alert.valid_bars ? ` / ${alert.valid_bars} 根` : ""}` : "—",
     );
-    appendCell(row, formatDate(alert.start_time_ms));
     appendCell(row, formatDate(alert.end_time_ms));
     appendCell(row, formatDate(alert.create_time));
     appendCell(row, formatDate(alert.last_fire_time));
@@ -342,22 +333,13 @@ async function loadAlerts({ quiet = false } = {}) {
 async function createAlert(event) {
   event.preventDefault();
   hideNotice();
-  if (!startTimeEdited) {
-    elements.alertStartTime.value = toDateTimeLocalValue(new Date());
-    updateAlertEndTime();
-  }
   const prices = elements.prices.value.trim();
   if (!prices) {
     showNotice("请输入至少一个价格", "error");
     elements.prices.focus();
     return;
   }
-  const startTimeMs = new Date(elements.alertStartTime.value).getTime();
   const validBars = Number(elements.validBars.value);
-  if (!Number.isFinite(startTimeMs)) {
-    showNotice("请选择有效的开始时间", "error");
-    return;
-  }
   if (!Number.isInteger(validBars) || validBars < 1 || validBars > 10000) {
     showNotice("有效 K 线数必须是 1～10000 的整数", "error");
     return;
@@ -367,7 +349,6 @@ async function createAlert(event) {
     prices,
     side: elements.alertSide.value,
     valid_bars: validBars,
-    start_time_ms: startTimeMs,
     resolution: elements.alertResolution.value,
   };
   const requestKey = JSON.stringify(alertConfig);
@@ -463,10 +444,6 @@ elements.alertResolution.addEventListener("change", () => {
 });
 elements.validBars.addEventListener("input", () => {
   validBarsEdited = true;
-  updateAlertEndTime();
-});
-elements.alertStartTime.addEventListener("input", () => {
-  startTimeEdited = true;
   updateAlertEndTime();
 });
 elements.refreshButton.addEventListener("click", () => {

@@ -116,10 +116,6 @@
               <label for="validBars">有效 K 线数</label>
               <input id="validBars" name="valid_bars" type="number" min="1" max="10000" step="1" value="720" required>
             </div>
-            <div class="form-field">
-              <label for="alertStartTime">开始时间</label>
-              <input id="alertStartTime" name="start_time" type="datetime-local" step="60" required>
-            </div>
           </div>
 
           <label for="prices">价格</label>
@@ -137,7 +133,7 @@
             <button id="createButton" class="button button-primary" type="submit">创建警报</button>
           </div>
           <p class="form-help">价格必须大于 0，不能重复；策略最多支持六个价格。</p>
-          <p class="form-help">有效期按自然时间折算，包含休市时间。预计结束：<strong id="alertEndTime">—</strong></p>
+          <p class="form-help">开始时间由后端自动设为当前时间；有效期按自然时间折算，包含休市时间。预计结束：<strong id="alertEndTime">—</strong></p>
         </form>
       </section>
 
@@ -162,7 +158,6 @@
                 <th>价格</th>
                 <th>方向</th>
                 <th>周期 / 有效</th>
-                <th>开始时间</th>
                 <th>结束时间</th>
                 <th>创建时间</th>
                 <th>最后触发</th>
