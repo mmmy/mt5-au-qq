@@ -66,7 +66,7 @@ class Settings:
             mt5_magic=int(os.getenv("MT5_MAGIC", "26082301")),
             mt5_deviation=int(os.getenv("MT5_DEVIATION", "20")),
             mt5_emergency_sl_distance=float(os.getenv("MT5_EMERGENCY_SL_DISTANCE", "20")),
-            mt5_demo_only=_env_bool("MT5_DEMO_ONLY", True),
+            mt5_demo_only=_env_bool("MT5_DEMO_ONLY", False),
             signal_max_age_seconds=int(os.getenv("SIGNAL_MAX_AGE_SECONDS", "180")),
             trading_enabled_at_start=_env_bool("TRADING_ENABLED_AT_START", False),
         )

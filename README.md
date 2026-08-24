@@ -71,7 +71,7 @@ Copy-Item .env.example .env
 | `MT5_MAGIC` | `26082301` | 本程序仓位标识 |
 | `MT5_DEVIATION` | `20` | 下单允许偏差点数 |
 | `MT5_EMERGENCY_SL_DISTANCE` | `20` | 券商端灾难保护止损价格距离，0 表示关闭 |
-| `MT5_DEMO_ONLY` | `true` | 只允许模拟账户 |
+| `MT5_DEMO_ONLY` | `false` | 是否只允许模拟账户；设为 `true` 时拒绝真实账户交易 |
 | `SIGNAL_MAX_AGE_SECONDS` | `180` | webhook 信号最大有效秒数 |
 | `TRADING_ENABLED_AT_START` | `false` | 启动时是否自动允许交易，不建议开启 |
 
