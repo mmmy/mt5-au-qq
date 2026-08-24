@@ -4,6 +4,8 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_MT5_TERMINAL = Path(r"D:\Program Files\MetaTrader 5\terminal64.exe")
@@ -39,6 +41,8 @@ class Settings:
 
     @classmethod
     def from_env(cls) -> "Settings":
+        # Keep explicitly supplied process/system variables authoritative.
+        load_dotenv(PROJECT_ROOT / ".env", override=False)
         terminal_path_raw = os.getenv("MT5_TERMINAL_PATH")
         if terminal_path_raw:
             terminal_path = Path(terminal_path_raw)
