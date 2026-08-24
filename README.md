@@ -7,7 +7,7 @@
 - 输入 1～6 个空格分隔的价格创建警报
 - 自动替换 `payload.json` 中对应的六组价格和开关
 - 创建时自动把 Pine 策略开始时间更新到当前 K 线
-- 只展示名称以 `MT5_AU_QQ::GOLD_PRICE::` 开头的警报
+- 只展示名称以 `MT5_AU::GOLD_PRICE::` 开头的警报
 - 删除前在服务端确认警报属于本项目
 - 使用请求 UUID 防止相同创建请求被重复执行
 - 接收 TradingView 策略 webhook，并根据仓位变化识别开多、开空、平多、平空
@@ -51,7 +51,7 @@ MT5 需要满足以下条件：
 | --- | --- | --- |
 | `TV_COOKIE_FILE` | 项目根目录 `.tv-cookie` | TradingView Cookie 文件 |
 | `TV_PAYLOAD_FILE` | 项目根目录 `payload.json` | TradingView 警报模板 |
-| `TV_ALERT_NAME_PREFIX` | `MT5_AU_QQ::GOLD_PRICE::` | 本项目警报名标识 |
+| `TV_ALERT_NAME_PREFIX` | `MT5_AU::GOLD_PRICE::` | 本项目警报名标识 |
 | `TV_ORIGIN` | `https://cn.tradingview.com` | TradingView Origin/Referer |
 | `TV_REQUEST_TIMEOUT_SECONDS` | `20` | TradingView 请求超时秒数 |
 | `TRADINGVIEW_WEBHOOK_URL` | 根据当前访问地址自动生成 | 写入新警报并展示在页面的 webhook URL；生产环境建议明确配置 |

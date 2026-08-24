@@ -13,7 +13,7 @@ from app.trade_repository import TradeRepository
 
 
 ROOT = Path(__file__).resolve().parent.parent
-PREFIX = "MT5_AU_QQ::GOLD_PRICE::"
+PREFIX = "MT5_AU::GOLD_PRICE::"
 
 
 class FakeTradingViewClient:

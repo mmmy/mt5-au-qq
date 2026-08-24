@@ -474,8 +474,3 @@ for (const button of elements.manualActionButtons) {
 
 initializeAlertForm();
 refreshDashboard();
-setInterval(() => {
-  if (document.visibilityState === "visible") {
-    refreshDashboard();
-  }
-}, 30_000);

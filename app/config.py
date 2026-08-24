@@ -50,7 +50,7 @@ class Settings:
             cookie_file=Path(os.getenv("TV_COOKIE_FILE", PROJECT_ROOT / ".tv-cookie")),
             payload_file=Path(os.getenv("TV_PAYLOAD_FILE", PROJECT_ROOT / "payload.json")),
             static_dir=Path(os.getenv("STATIC_DIR", PROJECT_ROOT / "app" / "static")),
-            alert_name_prefix=os.getenv("TV_ALERT_NAME_PREFIX", "MT5_AU_QQ::GOLD_PRICE::"),
+            alert_name_prefix=os.getenv("TV_ALERT_NAME_PREFIX", "MT5_AU::GOLD_PRICE::"),
             tradingview_origin=os.getenv("TV_ORIGIN", "https://cn.tradingview.com"),
             request_timeout_seconds=float(os.getenv("TV_REQUEST_TIMEOUT_SECONDS", "20")),
             database_file=Path(os.getenv("DATABASE_FILE", PROJECT_ROOT / "data" / "trading.db")),

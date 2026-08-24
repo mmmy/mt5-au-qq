@@ -43,7 +43,7 @@ def test_builder_replaces_prices_switches_name_and_start_time() -> None:
 
     result = builder.build(
         [Decimal("4600"), Decimal("4620.5"), Decimal("4660")],
-        name="MT5_AU_QQ::GOLD_PRICE::test",
+        name="MT5_AU::GOLD_PRICE::test",
         webhook_url="http://127.0.0.1:8000/api/webhooks/tradingview",
         now_ms=1787505555000,
     )
@@ -60,7 +60,7 @@ def test_builder_replaces_prices_switches_name_and_start_time() -> None:
         (False, 0),
     ]
     assert inputs["in_2"] == 1787505480000
-    assert result["payload"]["name"] == "MT5_AU_QQ::GOLD_PRICE::test"
+    assert result["payload"]["name"] == "MT5_AU::GOLD_PRICE::test"
     assert result["payload"]["web_hook"] == "http://127.0.0.1:8000/api/webhooks/tradingview"
     assert (ROOT / "payload.json").read_text(encoding="utf-8") == source_before
     json.dumps(result)
