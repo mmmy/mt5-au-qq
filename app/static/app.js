@@ -3,6 +3,11 @@
 const elements = {
   form: document.querySelector("#createForm"),
   prices: document.querySelector("#prices"),
+  alertSide: document.querySelector("#alertSide"),
+  alertResolution: document.querySelector("#alertResolution"),
+  validBars: document.querySelector("#validBars"),
+  alertStartTime: document.querySelector("#alertStartTime"),
+  alertEndTime: document.querySelector("#alertEndTime"),
   createButton: document.querySelector("#createButton"),
   refreshButton: document.querySelector("#refreshButton"),
   tableBody: document.querySelector("#alertTableBody"),
@@ -29,6 +34,19 @@ const elements = {
   clearSignalsButton: document.querySelector("#clearSignalsButton"),
 };
 let pendingCreate = null;
+let validBarsEdited = false;
+let startTimeEdited = false;
+const resolutionMinutes = {
+  "1": 1,
+  "2": 2,
+  "3": 3,
+  "5": 5,
+  "15": 15,
+  "30": 30,
+  "60": 60,
+  "120": 120,
+  "240": 240,
+};
 
 async function apiRequest(path, options = {}) {
   const response = await fetch(path, options);
@@ -108,6 +126,33 @@ function formatDate(value) {
     second: "2-digit",
     hour12: false,
   }).format(date);
+}
+
+function toDateTimeLocalValue(date) {
+  const offsetMs = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
+}
+
+function updateAlertEndTime() {
+  const startMs = new Date(elements.alertStartTime.value).getTime();
+  const bars = Number(elements.validBars.value);
+  const minutes = resolutionMinutes[elements.alertResolution.value];
+  if (!Number.isFinite(startMs) || !Number.isInteger(bars) || bars < 1 || !minutes) {
+    elements.alertEndTime.textContent = "—";
+    return;
+  }
+  elements.alertEndTime.textContent = formatDate(startMs + bars * minutes * 60_000);
+}
+
+function applyOneDayBarDefault() {
+  const minutes = resolutionMinutes[elements.alertResolution.value];
+  elements.validBars.value = String(Math.ceil((24 * 60) / minutes));
+  updateAlertEndTime();
+}
+
+function initializeAlertForm() {
+  elements.alertStartTime.value = toDateTimeLocalValue(new Date());
+  applyOneDayBarDefault();
 }
 
 function appendCell(row, value, className = "") {
@@ -252,7 +297,14 @@ function renderAlerts(alerts) {
     const nameCell = appendCell(row, alert.name, "name-cell");
     nameCell.title = alert.name;
     appendCell(row, alert.symbol || "—");
-    appendCell(row, alert.resolution ? `${alert.resolution} 分钟` : "—");
+    appendCell(row, alert.prices?.length ? alert.prices.join("、") : "—");
+    appendCell(row, alert.side || "—");
+    appendCell(
+      row,
+      alert.resolution ? `${alert.resolution} 分钟${alert.valid_bars ? ` / ${alert.valid_bars} 根` : ""}` : "—",
+    );
+    appendCell(row, formatDate(alert.start_time_ms));
+    appendCell(row, formatDate(alert.end_time_ms));
     appendCell(row, formatDate(alert.create_time));
     appendCell(row, formatDate(alert.last_fire_time));
 
@@ -290,26 +342,49 @@ async function loadAlerts({ quiet = false } = {}) {
 async function createAlert(event) {
   event.preventDefault();
   hideNotice();
+  if (!startTimeEdited) {
+    elements.alertStartTime.value = toDateTimeLocalValue(new Date());
+    updateAlertEndTime();
+  }
   const prices = elements.prices.value.trim();
   if (!prices) {
     showNotice("请输入至少一个价格", "error");
     elements.prices.focus();
     return;
   }
+  const startTimeMs = new Date(elements.alertStartTime.value).getTime();
+  const validBars = Number(elements.validBars.value);
+  if (!Number.isFinite(startTimeMs)) {
+    showNotice("请选择有效的开始时间", "error");
+    return;
+  }
+  if (!Number.isInteger(validBars) || validBars < 1 || validBars > 10000) {
+    showNotice("有效 K 线数必须是 1～10000 的整数", "error");
+    return;
+  }
+
+  const alertConfig = {
+    prices,
+    side: elements.alertSide.value,
+    valid_bars: validBars,
+    start_time_ms: startTimeMs,
+    resolution: elements.alertResolution.value,
+  };
+  const requestKey = JSON.stringify(alertConfig);
 
   elements.createButton.disabled = true;
   elements.createButton.textContent = "创建中……";
-  if (!pendingCreate || pendingCreate.prices !== prices) {
-    pendingCreate = { prices, requestId: createRequestId() };
+  if (!pendingCreate || pendingCreate.key !== requestKey) {
+    pendingCreate = { key: requestKey, requestId: createRequestId() };
   }
   try {
     const result = await apiRequest("/api/alerts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prices, request_id: pendingCreate.requestId }),
+      body: JSON.stringify({ ...alertConfig, request_id: pendingCreate.requestId }),
     });
     const message = result.created
-      ? `警报创建成功，价格：${result.prices.join("、")}`
+      ? `警报创建成功：${result.alert.side}，${result.alert.resolution} 分钟，${result.alert.valid_bars} 根 K 线`
       : "该请求对应的警报已经存在，未重复创建";
     showNotice(message);
     pendingCreate = null;
@@ -379,6 +454,21 @@ async function refreshDashboard() {
 }
 
 elements.form.addEventListener("submit", createAlert);
+elements.alertResolution.addEventListener("change", () => {
+  if (!validBarsEdited) {
+    applyOneDayBarDefault();
+  } else {
+    updateAlertEndTime();
+  }
+});
+elements.validBars.addEventListener("input", () => {
+  validBarsEdited = true;
+  updateAlertEndTime();
+});
+elements.alertStartTime.addEventListener("input", () => {
+  startTimeEdited = true;
+  updateAlertEndTime();
+});
 elements.refreshButton.addEventListener("click", () => {
   hideNotice();
   refreshDashboard();
@@ -405,6 +495,7 @@ for (const button of elements.manualActionButtons) {
   button.addEventListener("click", () => submitManualAction(button));
 }
 
+initializeAlertForm();
 refreshDashboard();
 setInterval(() => {
   if (document.visibilityState === "visible") {

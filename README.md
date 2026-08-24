@@ -95,9 +95,15 @@ GET    /api/trade-orders
 ```json
 {
   "prices": "4600 4620.5 4660",
+  "side": "自动",
+  "valid_bars": 720,
+  "start_time_ms": 1787582700000,
+  "resolution": "2",
   "request_id": "6ec3de30-cbfc-4402-b418-168b40d18b38"
 }
 ```
+
+创建警报时可以选择开仓方向、时间级别、有效 K 线数和开始时间。未提供时默认方向为“自动”、周期为 2 分钟、有效期按一天折算、开始时间为当前时间。有效期沿用 Pine 策略现有的自然时间计算方式，因此包含休市时间。新警报的参数会按 TradingView `alert_id` 保存到 SQLite，并在警报列表中回显。
 
 TradingView webhook 根据 `prevMarketPosition` 和 `marketPosition` 判断操作。相同 webhook 会通过信号哈希去重，不会重复下单。当前本机开发阶段按需求暂不校验 `signalToken`，部署到公网前必须增加鉴权。
 

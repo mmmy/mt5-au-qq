@@ -89,6 +89,39 @@
           </div>
         </div>
         <form id="createForm" class="create-form">
+          <div class="alert-config-grid">
+            <div class="form-field">
+              <label for="alertSide">开仓方向</label>
+              <select id="alertSide" name="side">
+                <option value="自动" selected>自动</option>
+                <option value="看多">看多</option>
+                <option value="看空">看空</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label for="alertResolution">警报时间级别</label>
+              <select id="alertResolution" name="resolution">
+                <option value="1">1 分钟</option>
+                <option value="2" selected>2 分钟</option>
+                <option value="3">3 分钟</option>
+                <option value="5">5 分钟</option>
+                <option value="15">15 分钟</option>
+                <option value="30">30 分钟</option>
+                <option value="60">1 小时</option>
+                <option value="120">2 小时</option>
+                <option value="240">4 小时</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label for="validBars">有效 K 线数</label>
+              <input id="validBars" name="valid_bars" type="number" min="1" max="10000" step="1" value="720" required>
+            </div>
+            <div class="form-field">
+              <label for="alertStartTime">开始时间</label>
+              <input id="alertStartTime" name="start_time" type="datetime-local" step="60" required>
+            </div>
+          </div>
+
           <label for="prices">价格</label>
           <div class="input-row">
             <input
@@ -104,6 +137,7 @@
             <button id="createButton" class="button button-primary" type="submit">创建警报</button>
           </div>
           <p class="form-help">价格必须大于 0，不能重复；策略最多支持六个价格。</p>
+          <p class="form-help">有效期按自然时间折算，包含休市时间。预计结束：<strong id="alertEndTime">—</strong></p>
         </form>
       </section>
 
@@ -125,7 +159,11 @@
                 <th>状态</th>
                 <th>名称</th>
                 <th>品种</th>
-                <th>周期</th>
+                <th>价格</th>
+                <th>方向</th>
+                <th>周期 / 有效</th>
+                <th>开始时间</th>
+                <th>结束时间</th>
                 <th>创建时间</th>
                 <th>最后触发</th>
                 <th class="actions-column">操作</th>

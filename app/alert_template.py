@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 import time
+from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
@@ -27,6 +29,34 @@ REQUIRED_WEBHOOK_PLACEHOLDERS = {
     "timestamp": "{{timenow}}",
     "id": "{{strategy.order.id}}",
 }
+ALERT_SIDES = {"自动", "看多", "看空"}
+RESOLUTION_MINUTES = {
+    "1": 1,
+    "2": 2,
+    "3": 3,
+    "5": 5,
+    "15": 15,
+    "30": 30,
+    "60": 60,
+    "120": 120,
+    "240": 240,
+}
+
+
+@dataclass(frozen=True, slots=True)
+class AlertStrategySettings:
+    side: str
+    valid_bars: int
+    start_time_ms: int
+    end_time_ms: int
+    resolution: str
+
+
+def default_valid_bars(resolution: str) -> int:
+    minutes = RESOLUTION_MINUTES.get(resolution)
+    if minutes is None:
+        raise ValidationError(f"不支持的警报时间级别：{resolution}")
+    return math.ceil(24 * 60 / minutes)
 
 
 def parse_prices(raw_prices: str) -> list[Decimal]:
@@ -83,6 +113,10 @@ class AlertTemplateBuilder:
         *,
         name: str,
         webhook_url: str | None = None,
+        side: str = "自动",
+        valid_bars: int | None = None,
+        start_time_ms: int | None = None,
+        resolution: str | None = None,
         now_ms: int | None = None,
     ) -> dict[str, Any]:
         template = self._load_template()
@@ -92,6 +126,16 @@ class AlertTemplateBuilder:
 
         inputs = self._find_strategy_inputs(payload)
         self._validate_price_inputs(inputs)
+        self._validate_strategy_inputs(inputs)
+
+        settings = self._resolve_strategy_settings(
+            payload,
+            side=side,
+            valid_bars=valid_bars,
+            start_time_ms=start_time_ms,
+            resolution=resolution,
+            now_ms=now_ms,
+        )
 
         for index, (enable_key, price_key) in enumerate(PRICE_INPUTS):
             enabled = index < len(prices)
@@ -101,8 +145,38 @@ class AlertTemplateBuilder:
         payload["name"] = name
         if webhook_url:
             payload["web_hook"] = webhook_url
-        self._update_start_time(payload, inputs, now_ms=now_ms)
+        inputs["in_0"] = settings.side
+        inputs["in_1"] = settings.valid_bars
+        inputs["in_2"] = settings.start_time_ms
+        payload["resolution"] = settings.resolution
+        for condition in payload.get("conditions") or []:
+            if isinstance(condition, dict):
+                condition["resolution"] = settings.resolution
         return template
+
+    def strategy_settings(self, template: dict[str, Any]) -> AlertStrategySettings:
+        payload = template.get("payload")
+        if not isinstance(payload, dict):
+            raise TemplateError("payload.json 缺少 payload 对象")
+        inputs = self._find_strategy_inputs(payload)
+        self._validate_strategy_inputs(inputs)
+        resolution = str(payload.get("resolution") or "")
+        if not resolution:
+            conditions = payload.get("conditions") or []
+            if conditions and isinstance(conditions[0], dict):
+                resolution = str(conditions[0].get("resolution") or "")
+        minutes = RESOLUTION_MINUTES.get(resolution)
+        if minutes is None:
+            raise TemplateError(f"模板包含不支持的警报时间级别：{resolution}")
+        start_time_ms = int(inputs["in_2"])
+        valid_bars = int(inputs["in_1"])
+        return AlertStrategySettings(
+            side=str(inputs["in_0"]),
+            valid_bars=valid_bars,
+            start_time_ms=start_time_ms,
+            end_time_ms=start_time_ms + valid_bars * minutes * 60_000,
+            resolution=resolution,
+        )
 
     def webhook_message(self) -> str:
         template = self._load_template()
@@ -162,19 +236,47 @@ class AlertTemplateBuilder:
             raise TemplateError("模板缺少价格参数：" + ", ".join(missing))
 
     @staticmethod
-    def _update_start_time(payload: dict[str, Any], inputs: dict[str, Any], *, now_ms: int | None) -> None:
-        if "in_2" not in inputs:
-            raise TemplateError("模板缺少开始时间参数 in_2")
-        current_ms = now_ms if now_ms is not None else time.time_ns() // 1_000_000
-        resolution = payload.get("resolution")
-        if not resolution:
+    def _validate_strategy_inputs(inputs: dict[str, Any]) -> None:
+        missing = [key for key in ("in_0", "in_1", "in_2") if key not in inputs]
+        if missing:
+            raise TemplateError("模板缺少策略参数：" + ", ".join(missing))
+
+    @staticmethod
+    def _resolve_strategy_settings(
+        payload: dict[str, Any],
+        *,
+        side: str,
+        valid_bars: int | None,
+        start_time_ms: int | None,
+        resolution: str | None,
+        now_ms: int | None,
+    ) -> AlertStrategySettings:
+        if side not in ALERT_SIDES:
+            raise ValidationError(f"不支持的开仓方向：{side}")
+        selected_resolution = str(resolution or payload.get("resolution") or "")
+        if not selected_resolution:
             conditions = payload.get("conditions")
             if isinstance(conditions, list) and conditions and isinstance(conditions[0], dict):
-                resolution = conditions[0].get("resolution")
-        try:
-            interval_ms = int(str(resolution)) * 60_000
-        except (TypeError, ValueError):
-            interval_ms = 60_000
-        if interval_ms <= 0:
-            interval_ms = 60_000
-        inputs["in_2"] = current_ms // interval_ms * interval_ms
+                selected_resolution = str(conditions[0].get("resolution") or "")
+        minutes = RESOLUTION_MINUTES.get(selected_resolution)
+        if minutes is None:
+            raise ValidationError(f"不支持的警报时间级别：{selected_resolution}")
+        selected_bars = default_valid_bars(selected_resolution) if valid_bars is None else valid_bars
+        if isinstance(selected_bars, bool) or not isinstance(selected_bars, int) or not 1 <= selected_bars <= 10_000:
+            raise ValidationError("有效 K 线数必须是 1～10000 的整数")
+        current_ms = now_ms if now_ms is not None else time.time_ns() // 1_000_000
+        selected_start_ms = current_ms if start_time_ms is None else start_time_ms
+        if isinstance(selected_start_ms, bool) or not isinstance(selected_start_ms, int) or selected_start_ms <= 0:
+            raise ValidationError("开始时间格式不正确")
+        interval_ms = minutes * 60_000
+        aligned_start_ms = selected_start_ms // interval_ms * interval_ms
+        end_time_ms = aligned_start_ms + selected_bars * interval_ms
+        if end_time_ms <= current_ms:
+            raise ValidationError("警报结束时间已经过去，请调整开始时间或有效 K 线数")
+        return AlertStrategySettings(
+            side=side,
+            valid_bars=selected_bars,
+            start_time_ms=aligned_start_ms,
+            end_time_ms=end_time_ms,
+            resolution=selected_resolution,
+        )

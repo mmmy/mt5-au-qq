@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from app.alert_template import AlertTemplateBuilder, parse_prices
+from app.alert_template import AlertTemplateBuilder, default_valid_bars, parse_prices
 from app.errors import TemplateError, ValidationError
 
 
@@ -85,3 +85,47 @@ def test_webhook_message_rejects_missing_placeholders(tmp_path: Path) -> None:
 
     with pytest.raises(TemplateError, match="必要占位符"):
         AlertTemplateBuilder(payload_file).webhook_message()
+
+
+@pytest.mark.parametrize(
+    ("resolution", "bars"),
+    [("1", 1440), ("2", 720), ("5", 288), ("15", 96), ("30", 48), ("60", 24), ("240", 6)],
+)
+def test_default_valid_bars_is_one_day(resolution: str, bars: int) -> None:
+    assert default_valid_bars(resolution) == bars
+
+
+def test_builder_replaces_strategy_settings_and_aligns_start_time() -> None:
+    builder = AlertTemplateBuilder(ROOT / "payload.json")
+    result = builder.build(
+        [Decimal("4600")],
+        name="settings-test",
+        side="看多",
+        valid_bars=288,
+        start_time_ms=1787582831000,
+        resolution="5",
+        now_ms=1787582700000,
+    )
+
+    inputs = strategy_inputs(result)
+    settings = builder.strategy_settings(result)
+    assert inputs["in_0"] == "看多"
+    assert inputs["in_1"] == 288
+    assert inputs["in_2"] == 1787582700000
+    assert result["payload"]["resolution"] == "5"
+    assert all(condition["resolution"] == "5" for condition in result["payload"]["conditions"])
+    assert settings.end_time_ms == 1787669100000
+
+
+def test_builder_rejects_alert_that_has_already_expired() -> None:
+    builder = AlertTemplateBuilder(ROOT / "payload.json")
+
+    with pytest.raises(ValidationError, match="结束时间已经过去"):
+        builder.build(
+            [Decimal("4600")],
+            name="expired-test",
+            valid_bars=1,
+            start_time_ms=1787580000000,
+            resolution="5",
+            now_ms=1787582700000,
+        )

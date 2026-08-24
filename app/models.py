@@ -9,6 +9,10 @@ from pydantic import BaseModel, Field
 
 class CreateAlertRequest(BaseModel):
     prices: str = Field(min_length=1, max_length=200)
+    side: Literal["自动", "看多", "看空"] = "自动"
+    valid_bars: int | None = Field(default=None, ge=1, le=10_000)
+    start_time_ms: int | None = Field(default=None, gt=0)
+    resolution: Literal["1", "2", "3", "5", "15", "30", "60", "120", "240"] = "2"
     request_id: UUID = Field(default_factory=uuid4)
 
 
@@ -20,6 +24,11 @@ class AlertItem(BaseModel):
     resolution: str
     create_time: str | None = None
     last_fire_time: str | None = None
+    prices: list[str] | None = None
+    side: str | None = None
+    valid_bars: int | None = None
+    start_time_ms: int | None = None
+    end_time_ms: int | None = None
 
 
 class CreateAlertResponse(BaseModel):

@@ -50,6 +50,17 @@ class TradeRepository:
                     FOREIGN KEY(signal_id) REFERENCES trade_signals(signal_id)
                 );
 
+                CREATE TABLE IF NOT EXISTS tv_alert_configs (
+                    alert_id INTEGER PRIMARY KEY,
+                    prices_json TEXT NOT NULL,
+                    side TEXT NOT NULL,
+                    valid_bars INTEGER NOT NULL,
+                    start_time_ms INTEGER NOT NULL,
+                    end_time_ms INTEGER NOT NULL,
+                    resolution TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                );
+
                 CREATE INDEX IF NOT EXISTS idx_trade_signals_received_at
                     ON trade_signals(received_at DESC);
                 CREATE INDEX IF NOT EXISTS idx_trade_orders_signal_id
@@ -174,6 +185,63 @@ class TradeRepository:
                 (safe_limit,),
             ).fetchall()
         return [OrderItem(**self._row_to_dict(row)) for row in rows]
+
+    def upsert_alert_config(
+        self,
+        *,
+        alert_id: int,
+        prices: list[str],
+        side: str,
+        valid_bars: int,
+        start_time_ms: int,
+        end_time_ms: int,
+        resolution: str,
+    ) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO tv_alert_configs
+                    (alert_id, prices_json, side, valid_bars, start_time_ms, end_time_ms, resolution, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(alert_id) DO UPDATE SET
+                    prices_json = excluded.prices_json,
+                    side = excluded.side,
+                    valid_bars = excluded.valid_bars,
+                    start_time_ms = excluded.start_time_ms,
+                    end_time_ms = excluded.end_time_ms,
+                    resolution = excluded.resolution
+                """,
+                (
+                    alert_id,
+                    json.dumps(prices, ensure_ascii=False),
+                    side,
+                    valid_bars,
+                    start_time_ms,
+                    end_time_ms,
+                    resolution,
+                    utc_now(),
+                ),
+            )
+
+    def get_alert_configs(self, alert_ids: list[int]) -> dict[int, dict[str, Any]]:
+        if not alert_ids:
+            return {}
+        placeholders = ", ".join("?" for _ in alert_ids)
+        with self._connect() as connection:
+            rows = connection.execute(
+                f"SELECT * FROM tv_alert_configs WHERE alert_id IN ({placeholders})",
+                alert_ids,
+            ).fetchall()
+        result: dict[int, dict[str, Any]] = {}
+        for row in rows:
+            item = self._row_to_dict(row)
+            item["prices"] = json.loads(item.pop("prices_json"))
+            result[int(item["alert_id"])] = item
+        return result
+
+    def delete_alert_config(self, alert_id: int) -> None:
+        with self._connect() as connection:
+            connection.execute("DELETE FROM tv_alert_configs WHERE alert_id = ?", (alert_id,))
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.database_file, timeout=10)

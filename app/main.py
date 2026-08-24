@@ -45,6 +45,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        repository = TradeRepository(app_settings.database_file)
+        repository.initialize()
         client = TradingViewClient(
             app_settings.cookie_file,
             origin=app_settings.tradingview_origin,
@@ -57,8 +59,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             template_builder,
             name_prefix=app_settings.alert_name_prefix,
             webhook_url=app_settings.local_webhook_url,
+            repository=repository,
         )
-        repository = TradeRepository(app_settings.database_file)
         gateway = Mt5Gateway(
             terminal_path=app_settings.mt5_terminal_path,
             symbol=app_settings.mt5_symbol,
@@ -108,6 +110,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             data.prices,
             data.request_id,
             webhook_url=webhook_url,
+            side=data.side,
+            valid_bars=data.valid_bars,
+            start_time_ms=data.start_time_ms,
+            resolution=data.resolution,
         )
 
     @app.delete("/api/alerts/{alert_id}", response_model=DeleteAlertResponse)

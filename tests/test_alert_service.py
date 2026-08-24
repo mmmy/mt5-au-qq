@@ -9,6 +9,7 @@ import pytest
 from app.alert_service import AlertService
 from app.alert_template import AlertTemplateBuilder
 from app.errors import AlertNotFoundError
+from app.trade_repository import TradeRepository
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -33,12 +34,13 @@ class FakeTradingViewClient:
         self.deleted_ids.append(alert_ids)
 
 
-def build_service(client: FakeTradingViewClient) -> AlertService:
+def build_service(client: FakeTradingViewClient, repository: TradeRepository | None = None) -> AlertService:
     return AlertService(
         client,
         AlertTemplateBuilder(ROOT / "payload.json"),
         name_prefix=PREFIX,
         webhook_url="http://127.0.0.1:8000/api/webhooks/tradingview",
+        repository=repository,
     )  # type: ignore[arg-type]
 
 
@@ -119,3 +121,28 @@ def test_delete_project_alert() -> None:
 
     assert result.deleted is True
     assert client.deleted_ids == [[12]]
+
+
+def test_list_enriches_tradingview_alert_with_saved_strategy_settings(tmp_path: Path) -> None:
+    repository = TradeRepository(tmp_path / "trading.db")
+    repository.initialize()
+    repository.upsert_alert_config(
+        alert_id=12,
+        prices=["4600", "4620.5"],
+        side="看多",
+        valid_bars=288,
+        start_time_ms=1787582700000,
+        end_time_ms=1787669100000,
+        resolution="5",
+    )
+    client = FakeTradingViewClient(
+        [{"alert_id": 12, "name": PREFIX + "abc", "active": True, "symbol": "FX:XAUUSD", "resolution": "5"}]
+    )
+
+    result = asyncio.run(build_service(client, repository).list_alerts())
+
+    assert result[0].prices == ["4600", "4620.5"]
+    assert result[0].side == "看多"
+    assert result[0].valid_bars == 288
+    assert result[0].start_time_ms == 1787582700000
+    assert result[0].end_time_ms == 1787669100000
