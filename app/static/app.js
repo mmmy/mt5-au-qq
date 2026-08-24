@@ -56,6 +56,29 @@ function createRequestId() {
   });
 }
 
+async function copyText(text) {
+  if (navigator.clipboard && globalThis.isSecureContext) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.left = "-9999px";
+  textarea.style.opacity = "0";
+  document.body.append(textarea);
+  textarea.select();
+  textarea.setSelectionRange(0, textarea.value.length);
+
+  const copied = document.execCommand("copy");
+  textarea.remove();
+  if (!copied) {
+    throw new Error("复制失败");
+  }
+}
+
 function showNotice(message, type = "success") {
   elements.notice.textContent = message;
   elements.notice.className = `notice ${type}`;
@@ -350,7 +373,7 @@ elements.refreshButton.addEventListener("click", () => {
 elements.tradingToggle.addEventListener("change", () => toggleTrading(elements.tradingToggle.checked));
 elements.copyWebhookButton.addEventListener("click", async () => {
   try {
-    await navigator.clipboard.writeText(elements.webhookUrl.textContent);
+    await copyText(elements.webhookUrl.textContent);
     showNotice("Webhook URL 已复制");
   } catch (_error) {
     showNotice("无法自动复制，请手动选择 URL", "error");
