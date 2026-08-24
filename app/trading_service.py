@@ -158,7 +158,7 @@ class TradingService:
         repository: TradeRepository,
         gateway: Mt5Gateway,
         *,
-        webhook_url: str,
+        webhook_url: str | None,
         symbol: str,
         volume: float,
         max_volume: float,
@@ -199,11 +199,11 @@ class TradingService:
         with self._enabled_lock:
             return self._enabled
 
-    async def runtime_status(self) -> TradingRuntimeStatus:
+    async def runtime_status(self, *, webhook_url: str | None = None) -> TradingRuntimeStatus:
         mt5_status = await asyncio.to_thread(self.worker.get_status)
         return TradingRuntimeStatus(
             enabled=self.is_enabled(),
-            webhook_url=self.webhook_url,
+            webhook_url=webhook_url or self.webhook_url or "",
             volume=self.volume,
             max_volume=self.max_volume,
             emergency_sl_distance=self.emergency_sl_distance,

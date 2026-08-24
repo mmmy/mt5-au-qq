@@ -54,7 +54,7 @@ MT5 需要满足以下条件：
 | `TV_ALERT_NAME_PREFIX` | `MT5_AU_QQ::GOLD_PRICE::` | 本项目警报名标识 |
 | `TV_ORIGIN` | `https://cn.tradingview.com` | TradingView Origin/Referer |
 | `TV_REQUEST_TIMEOUT_SECONDS` | `20` | TradingView 请求超时秒数 |
-| `TRADINGVIEW_WEBHOOK_URL` | `http://127.0.0.1:8000/api/webhooks/tradingview` | 写入新警报并展示在页面的 webhook URL |
+| `TRADINGVIEW_WEBHOOK_URL` | 根据当前访问地址自动生成 | 写入新警报并展示在页面的 webhook URL；生产环境建议明确配置 |
 | `DATABASE_FILE` | `data/trading.db` | SQLite 数据文件 |
 | `MT5_TERMINAL_PATH` | 自动识别当前终端 | MT5 terminal64.exe 路径 |
 | `MT5_SYMBOL` | `XAUUSD` | MT5 黄金品种名称 |
@@ -99,6 +99,8 @@ GET    /api/trade-orders
 ```
 
 TradingView webhook 根据 `prevMarketPosition` 和 `marketPosition` 判断操作。相同 webhook 会通过信号哈希去重，不会重复下单。当前本机开发阶段按需求暂不校验 `signalToken`，部署到公网前必须增加鉴权。
+
+未配置 `TRADINGVIEW_WEBHOOK_URL` 时，程序会根据浏览器访问页面时使用的协议和 Host 自动生成 URL。例如通过 `https://trade.example.com` 打开页面时，会生成 `https://trade.example.com/api/webhooks/tradingview`。如果通过 `127.0.0.1` 打开，生成的仍会是 `127.0.0.1`。反向代理需要保留原始 `Host`，并正确传递 HTTPS 协议信息。
 
 “清除记录”只会在页面隐藏已经结束的信号，不会删除去重数据；等待中和执行中的信号不会被清除。
 

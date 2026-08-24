@@ -25,7 +25,7 @@ class Settings:
     tradingview_origin: str
     request_timeout_seconds: float
     database_file: Path
-    local_webhook_url: str
+    local_webhook_url: str | None
     mt5_terminal_path: Path | None
     mt5_symbol: str
     mt5_volume: float
@@ -54,10 +54,7 @@ class Settings:
             tradingview_origin=os.getenv("TV_ORIGIN", "https://cn.tradingview.com"),
             request_timeout_seconds=float(os.getenv("TV_REQUEST_TIMEOUT_SECONDS", "20")),
             database_file=Path(os.getenv("DATABASE_FILE", PROJECT_ROOT / "data" / "trading.db")),
-            local_webhook_url=os.getenv(
-                "TRADINGVIEW_WEBHOOK_URL",
-                "http://127.0.0.1:8000/api/webhooks/tradingview",
-            ),
+            local_webhook_url=os.getenv("TRADINGVIEW_WEBHOOK_URL") or None,
             mt5_terminal_path=terminal_path,
             mt5_symbol=os.getenv("MT5_SYMBOL", "XAUUSD"),
             mt5_volume=float(os.getenv("MT5_VOLUME", "0.01")),

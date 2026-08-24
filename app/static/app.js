@@ -139,7 +139,7 @@ async function loadTradingStatus() {
     elements.quoteStatus.className = mt5.bid && mt5.ask ? "good" : "bad";
     elements.positionStatus.textContent = `多 ${mt5.owned_long_positions} / 空 ${mt5.owned_short_positions}`;
     elements.positionStatus.className = "";
-    elements.webhookUrl.textContent = data.webhook_url;
+    elements.webhookUrl.textContent = data.webhook_url || `${window.location.origin}/api/webhooks/tradingview`;
     elements.tradingToggle.checked = data.enabled;
     elements.tradingToggle.disabled = false;
     for (const button of elements.manualActionButtons) {

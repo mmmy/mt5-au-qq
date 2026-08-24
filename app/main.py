@@ -32,6 +32,13 @@ from app.tradingview import TradingViewClient
 from app.trading_service import TradingService
 
 
+def resolve_webhook_url(request: Request, configured_url: str | None) -> str:
+    if configured_url:
+        return configured_url
+    base_url = str(request.base_url).rstrip("/")
+    return f"{base_url}/api/webhooks/tradingview"
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     app_settings = settings or Settings.from_env()
 
@@ -93,7 +100,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.post("/api/alerts", response_model=CreateAlertResponse)
     async def create_alert(data: CreateAlertRequest, request: Request) -> CreateAlertResponse:
-        return await request.app.state.alert_service.create_alert(data.prices, data.request_id)
+        webhook_url = resolve_webhook_url(request, request.app.state.settings.local_webhook_url)
+        return await request.app.state.alert_service.create_alert(
+            data.prices,
+            data.request_id,
+            webhook_url=webhook_url,
+        )
 
     @app.delete("/api/alerts/{alert_id}", response_model=DeleteAlertResponse)
     async def delete_alert(alert_id: int, request: Request) -> DeleteAlertResponse:
@@ -118,7 +130,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/api/trading/status", response_model=TradingRuntimeStatus)
     async def trading_status(request: Request) -> TradingRuntimeStatus:
-        return await request.app.state.trading_service.runtime_status()
+        webhook_url = resolve_webhook_url(request, request.app.state.settings.local_webhook_url)
+        return await request.app.state.trading_service.runtime_status(webhook_url=webhook_url)
 
     @app.post("/api/trading/enable", response_model=TradingToggleResponse)
     async def enable_trading(request: Request) -> TradingToggleResponse:

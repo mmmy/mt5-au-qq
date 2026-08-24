@@ -8,7 +8,7 @@ from typing import Any
 from uuid import UUID
 
 from app.alert_template import AlertTemplateBuilder, decimal_to_string, parse_prices
-from app.errors import AlertNotFoundError, TradingViewError
+from app.errors import AlertNotFoundError, TemplateError, TradingViewError
 from app.models import AlertItem, CreateAlertResponse, DeleteAlertResponse
 from app.tradingview import TradingViewClient
 
@@ -20,7 +20,7 @@ class AlertService:
         template_builder: AlertTemplateBuilder,
         *,
         name_prefix: str,
-        webhook_url: str,
+        webhook_url: str | None,
     ) -> None:
         self.client = client
         self.template_builder = template_builder
@@ -34,7 +34,13 @@ class AlertService:
         project_alerts.sort(key=lambda item: item.create_time or "", reverse=True)
         return project_alerts
 
-    async def create_alert(self, raw_prices: str, request_id: UUID) -> CreateAlertResponse:
+    async def create_alert(
+        self,
+        raw_prices: str,
+        request_id: UUID,
+        *,
+        webhook_url: str | None = None,
+    ) -> CreateAlertResponse:
         prices = parse_prices(raw_prices)
         price_strings = [decimal_to_string(price) for price in prices]
         name = self.name_prefix + request_id.hex
@@ -44,7 +50,10 @@ class AlertService:
             if existing is not None:
                 return CreateAlertResponse(created=False, prices=price_strings, alert=existing)
 
-            template = self.template_builder.build(prices, name=name, webhook_url=self.webhook_url)
+            effective_webhook_url = webhook_url or self.webhook_url
+            if not effective_webhook_url:
+                raise TemplateError("无法确定 TradingView webhook URL")
+            template = self.template_builder.build(prices, name=name, webhook_url=effective_webhook_url)
             alert_id = await self.client.create_alert(template)
             if alert_id is None:
                 created_alert = await self._find_by_name(name)

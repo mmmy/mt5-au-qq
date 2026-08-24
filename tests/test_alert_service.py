@@ -68,14 +68,20 @@ def test_create_builds_payload_and_returns_normalized_prices() -> None:
     client = FakeTradingViewClient(create_id=55)
     service = build_service(client)
 
-    result = asyncio.run(service.create_alert("4600.00 4620.5", UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")))
+    result = asyncio.run(
+        service.create_alert(
+            "4600.00 4620.5",
+            UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
+            webhook_url="https://trade.example.com/api/webhooks/tradingview",
+        )
+    )
 
     assert result.created is True
     assert result.prices == ["4600", "4620.5"]
     assert result.alert.alert_id == 55
     assert result.alert.name == PREFIX + "aaaaaaaaaaaa4aaa8aaaaaaaaaaaaaaa"
     assert len(client.created_payloads) == 1
-    assert client.created_payloads[0]["payload"]["web_hook"] == "http://127.0.0.1:8000/api/webhooks/tradingview"
+    assert client.created_payloads[0]["payload"]["web_hook"] == "https://trade.example.com/api/webhooks/tradingview"
 
 
 def test_create_is_idempotent_for_existing_request_id() -> None:
