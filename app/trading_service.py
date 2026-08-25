@@ -40,6 +40,7 @@ MANUAL_ACTIONS = {
     TradeAction.CLOSE_LONG,
     TradeAction.CLOSE_SHORT,
 }
+TRADING_ENABLED_SETTING = "trading_enabled"
 
 
 def derive_trade_action(previous: str, current: str) -> TradeAction:
@@ -178,11 +179,23 @@ class TradingService:
         self.signal_max_age_seconds = signal_max_age_seconds
         self.strategy_name = strategy_name
         self._enabled = enabled_at_start
+        self._enabled_at_start = enabled_at_start
         self._enabled_lock = threading.Lock()
         self.worker = Mt5Worker(repository, gateway, self.is_enabled)
 
     def start(self) -> None:
         self.repository.initialize()
+        persisted_enabled = self.repository.get_runtime_setting(TRADING_ENABLED_SETTING)
+        if persisted_enabled is None:
+            self.repository.set_runtime_setting(
+                TRADING_ENABLED_SETTING,
+                "1" if self._enabled_at_start else "0",
+            )
+            restored_enabled = self._enabled_at_start
+        else:
+            restored_enabled = persisted_enabled == "1"
+        with self._enabled_lock:
+            self._enabled = restored_enabled
         self.worker.start()
         queued = self.repository.list_queued_signal_ids()
         if self.is_enabled():
@@ -198,6 +211,11 @@ class TradingService:
     def is_enabled(self) -> bool:
         with self._enabled_lock:
             return self._enabled
+
+    def _set_enabled(self, enabled: bool) -> None:
+        with self._enabled_lock:
+            self.repository.set_runtime_setting(TRADING_ENABLED_SETTING, "1" if enabled else "0")
+            self._enabled = enabled
 
     async def runtime_status(self, *, webhook_url: str | None = None) -> TradingRuntimeStatus:
         mt5_status = await asyncio.to_thread(self.worker.get_status)
@@ -225,14 +243,12 @@ class TradingService:
             raise Mt5NotReadyError("安全保护：当前只允许模拟账户")
         if not status.symbol_available:
             raise Mt5NotReadyError(f"找不到交易品种 {self.symbol}")
-        with self._enabled_lock:
-            self._enabled = True
-        return TradingToggleResponse(enabled=True, message="交易执行已启用")
+        self._set_enabled(True)
+        return TradingToggleResponse(enabled=True, message="交易执行已启用，开关状态已保存")
 
     def disable(self) -> TradingToggleResponse:
-        with self._enabled_lock:
-            self._enabled = False
-        return TradingToggleResponse(enabled=False, message="交易执行已停止；已有持仓不会自动平仓")
+        self._set_enabled(False)
+        return TradingToggleResponse(enabled=False, message="交易执行已停止并保存；已有持仓不会自动平仓")
 
     def ingest_webhook(self, payload: TradingViewWebhook) -> WebhookResponse:
         if payload.name != self.strategy_name:

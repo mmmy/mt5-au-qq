@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 import time
 from pathlib import Path
 
 import pytest
 
 from app.errors import ValidationError
-from app.models import TradeAction, TradingViewWebhook
+from app.models import Mt5Status, TradeAction, TradingViewWebhook
 from app.trade_repository import TradeRepository
 from app.trading_service import TradingService, derive_trade_action, webhook_signal_id
 
@@ -20,6 +21,20 @@ class FakeGateway:
 
     def shutdown(self) -> None:
         return None
+
+
+class ReadyGateway(FakeGateway):
+    def status(self) -> Mt5Status:
+        return Mt5Status(
+            initialized=True,
+            connected=True,
+            terminal_trade_allowed=True,
+            account_trade_allowed=True,
+            account_trade_expert=True,
+            demo_account=True,
+            symbol="XAUUSD",
+            symbol_available=True,
+        )
 
 
 def make_webhook(**overrides: str) -> TradingViewWebhook:
@@ -113,6 +128,69 @@ def test_webhook_rejects_expired_signal(tmp_path: Path) -> None:
 
     with pytest.raises(ValidationError, match="过期"):
         service.ingest_webhook(make_webhook(timestamp="1000"))
+
+
+def test_trading_switch_persists_across_restarts(tmp_path: Path) -> None:
+    repository = TradeRepository(tmp_path / "trading.db")
+    repository.initialize()
+    first = TradingService(
+        repository,
+        ReadyGateway(),  # type: ignore[arg-type]
+        webhook_url=None,
+        symbol="XAUUSD",
+        volume=0.01,
+        max_volume=0.1,
+        emergency_sl_distance=20,
+        demo_only=True,
+        signal_max_age_seconds=180,
+        enabled_at_start=False,
+    )
+    first.start()
+    try:
+        assert first.is_enabled() is False
+        asyncio.run(first.enable())
+        assert first.is_enabled() is True
+        assert repository.get_runtime_setting("trading_enabled") == "1"
+    finally:
+        first.stop()
+
+    restored = TradingService(
+        repository,
+        ReadyGateway(),  # type: ignore[arg-type]
+        webhook_url=None,
+        symbol="XAUUSD",
+        volume=0.01,
+        max_volume=0.1,
+        emergency_sl_distance=20,
+        demo_only=True,
+        signal_max_age_seconds=180,
+        enabled_at_start=False,
+    )
+    restored.start()
+    try:
+        assert restored.is_enabled() is True
+        restored.disable()
+        assert repository.get_runtime_setting("trading_enabled") == "0"
+    finally:
+        restored.stop()
+
+    disabled = TradingService(
+        repository,
+        ReadyGateway(),  # type: ignore[arg-type]
+        webhook_url=None,
+        symbol="XAUUSD",
+        volume=0.01,
+        max_volume=0.1,
+        emergency_sl_distance=20,
+        demo_only=True,
+        signal_max_age_seconds=180,
+        enabled_at_start=True,
+    )
+    disabled.start()
+    try:
+        assert disabled.is_enabled() is False
+    finally:
+        disabled.stop()
 
 
 def test_clear_completed_signals_hides_records_but_preserves_deduplication(tmp_path: Path) -> None:

@@ -24,8 +24,11 @@ const elements = {
   positionStatus: document.querySelector("#positionStatus"),
   webhookUrl: document.querySelector("#webhookUrl"),
   copyWebhookButton: document.querySelector("#copyWebhookButton"),
+  openWebhookMessageButton: document.querySelector("#openWebhookMessageButton"),
+  webhookMessageDialog: document.querySelector("#webhookMessageDialog"),
   webhookMessage: document.querySelector("#webhookMessage"),
   copyWebhookMessageButton: document.querySelector("#copyWebhookMessageButton"),
+  closeWebhookDialogButtons: [...document.querySelectorAll("[data-close-webhook-dialog]")],
   manualActionButtons: [...document.querySelectorAll("[data-trade-action]")],
   tradingHelp: document.querySelector("#tradingHelp"),
   signalTableBody: document.querySelector("#signalTableBody"),
@@ -105,6 +108,14 @@ function showNotice(message, type = "success") {
 
 function hideNotice() {
   elements.notice.hidden = true;
+}
+
+function openWebhookMessageDialog() {
+  elements.webhookMessageDialog.showModal();
+}
+
+function closeWebhookMessageDialog() {
+  elements.webhookMessageDialog.close();
 }
 
 function formatDate(value) {
@@ -228,7 +239,7 @@ async function loadTradingStatus() {
     }
     elements.tradingHelp.textContent = mt5.error
       ? mt5.error
-      : `固定手数 ${data.volume}，灾难保护止损距离 ${data.emergency_sl_distance}，程序重启后默认停止交易。`;
+      : `固定手数 ${data.volume}，灾难保护止损距离 ${data.emergency_sl_distance}，开关状态已持久化。`;
   } catch (error) {
     elements.tradingToggle.disabled = false;
     setStatus(elements.mt5ConnectionStatus, "读取失败", false);
@@ -465,6 +476,15 @@ elements.copyWebhookButton.addEventListener("click", async () => {
     showNotice("Webhook URL 已复制");
   } catch (_error) {
     showNotice("无法自动复制，请手动选择 URL", "error");
+  }
+});
+elements.openWebhookMessageButton.addEventListener("click", openWebhookMessageDialog);
+for (const button of elements.closeWebhookDialogButtons) {
+  button.addEventListener("click", closeWebhookMessageDialog);
+}
+elements.webhookMessageDialog.addEventListener("click", (event) => {
+  if (event.target === elements.webhookMessageDialog) {
+    closeWebhookMessageDialog();
   }
 });
 elements.copyWebhookMessageButton.addEventListener("click", async () => {

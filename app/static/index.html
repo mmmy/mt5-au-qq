@@ -66,19 +66,19 @@
           <button id="copyWebhookButton" class="button button-secondary" type="button">复制</button>
         </div>
 
-        <div class="webhook-box webhook-message-box">
-          <div class="webhook-message-content">
+        <div class="webhook-box">
+          <div>
             <span>TradingView 警报消息 JSON</span>
-            <textarea id="webhookMessage" readonly spellcheck="false" aria-label="TradingView 警报消息 JSON">读取中……</textarea>
+            <p class="webhook-message-summary">用于创建 TradingView 策略警报时填写的消息内容。</p>
           </div>
-          <button id="copyWebhookMessageButton" class="button button-secondary" type="button">复制 JSON</button>
+          <button id="openWebhookMessageButton" class="button button-secondary" type="button">查看详情</button>
         </div>
 
         <div class="manual-actions" aria-label="MT5 手动平仓操作">
           <button class="button action-button" type="button" data-trade-action="close_long">平多</button>
           <button class="button action-button" type="button" data-trade-action="close_short">平空</button>
         </div>
-        <p class="form-help trading-help" id="tradingHelp">程序重启后默认停止交易，必须手动启用。</p>
+        <p class="form-help trading-help" id="tradingHelp">开关状态会自动保存，并在程序重启后恢复。</p>
       </section>
 
       <section class="panel create-panel" aria-labelledby="createTitle">
@@ -203,6 +203,23 @@
         </div>
       </section>
     </main>
+
+    <dialog id="webhookMessageDialog" class="detail-dialog" aria-labelledby="webhookMessageDialogTitle">
+      <div class="detail-dialog-content">
+        <header class="detail-dialog-header">
+          <div>
+            <p class="eyebrow">TradingView</p>
+            <h2 id="webhookMessageDialogTitle">警报消息 JSON</h2>
+          </div>
+          <button class="dialog-close-button" type="button" data-close-webhook-dialog aria-label="关闭弹窗">×</button>
+        </header>
+        <textarea id="webhookMessage" readonly spellcheck="false" aria-label="TradingView 警报消息 JSON">读取中……</textarea>
+        <footer class="detail-dialog-footer">
+          <button class="button button-secondary" type="button" data-close-webhook-dialog>关闭</button>
+          <button id="copyWebhookMessageButton" class="button button-primary" type="button">复制 JSON</button>
+        </footer>
+      </div>
+    </dialog>
 
     <script src="/static/app.js" defer></script>
   </body>

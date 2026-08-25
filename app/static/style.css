@@ -249,28 +249,89 @@ h2 {
   white-space: nowrap;
 }
 
-.webhook-message-box {
-  align-items: flex-start;
+.webhook-message-summary {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 13px;
 }
 
-.webhook-message-content {
-  width: 100%;
-}
-
-.webhook-message-content textarea {
-  width: 100%;
-  min-height: 260px;
-  padding: 12px 14px;
+.detail-dialog {
+  width: min(760px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  padding: 0;
+  overflow: hidden;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 14px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 24px 70px rgb(0 0 0 / 35%);
+}
+
+.detail-dialog::backdrop {
+  background: rgb(15 17 21 / 72%);
+  backdrop-filter: blur(3px);
+}
+
+.detail-dialog-content {
+  display: flex;
+  max-height: calc(100vh - 48px);
+  flex-direction: column;
+}
+
+.detail-dialog-header,
+.detail-dialog-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px;
+}
+
+.detail-dialog-header {
+  border-bottom: 1px solid var(--border);
+}
+
+.detail-dialog-header h2,
+.detail-dialog-header .eyebrow {
+  margin: 0;
+}
+
+.dialog-close-button {
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--panel-soft);
+  color: var(--text);
+  font-size: 25px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.dialog-close-button:hover {
+  border-color: var(--accent);
+}
+
+.detail-dialog textarea {
+  width: 100%;
+  min-height: 360px;
+  padding: 16px 20px;
+  overflow: auto;
+  border: 0;
   outline: none;
-  resize: vertical;
+  resize: none;
   background: var(--bg);
   color: var(--accent-hover);
   font-family: Consolas, "Courier New", monospace;
   font-size: 13px;
   line-height: 1.55;
   white-space: pre;
+}
+
+.detail-dialog-footer {
+  justify-content: flex-end;
+  border-top: 1px solid var(--border);
 }
 
 .manual-actions {

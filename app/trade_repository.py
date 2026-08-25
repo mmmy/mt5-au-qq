@@ -61,6 +61,12 @@ class TradeRepository:
                     created_at TEXT NOT NULL
                 );
 
+                CREATE TABLE IF NOT EXISTS runtime_settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+
                 CREATE INDEX IF NOT EXISTS idx_trade_signals_received_at
                     ON trade_signals(received_at DESC);
                 CREATE INDEX IF NOT EXISTS idx_trade_orders_signal_id
@@ -154,6 +160,27 @@ class TradeRepository:
                 "SELECT signal_id FROM trade_signals WHERE status = 'queued' ORDER BY received_at",
             ).fetchall()
         return [str(row["signal_id"]) for row in rows]
+
+    def get_runtime_setting(self, key: str) -> str | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT value FROM runtime_settings WHERE key = ?",
+                (key,),
+            ).fetchone()
+        return str(row["value"]) if row else None
+
+    def set_runtime_setting(self, key: str, value: str) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO runtime_settings (key, value, updated_at)
+                VALUES (?, ?, ?)
+                ON CONFLICT(key) DO UPDATE SET
+                    value = excluded.value,
+                    updated_at = excluded.updated_at
+                """,
+                (key, value, utc_now()),
+            )
 
     def add_order(
         self,

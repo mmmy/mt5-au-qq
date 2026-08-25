@@ -14,7 +14,7 @@
 - SQLite 持久化信号、执行状态和 MT5 订单
 - 单一 MT5 工作线程串行执行交易
 - 默认仅允许模拟账户，使用固定小手数和独立 magic number
-- 页面展示 MT5 状态、本机 webhook URL、交易总开关和手动测试按钮
+- 页面展示 MT5 状态、本机 webhook URL、交易总开关和手动测试按钮，交易开关状态会持久化
 
 ## 安装和运行
 
@@ -34,7 +34,7 @@ python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 
 浏览器打开 <http://127.0.0.1:8000>。API 文档位于 <http://127.0.0.1:8000/docs>。
 
-不要使用多个 Uvicorn worker。所有 MT5 操作都在一个专用工作线程中串行执行。程序启动后默认停止交易，必须在页面确认 MT5 状态正常后手动启用。
+不要使用多个 Uvicorn worker。所有 MT5 操作都在一个专用工作线程中串行执行。首次运行默认停止交易；在页面手动切换后，开关状态会保存到 SQLite 并在后续重启时恢复。
 
 MT5 需要满足以下条件：
 
@@ -73,7 +73,7 @@ Copy-Item .env.example .env
 | `MT5_EMERGENCY_SL_DISTANCE` | `20` | 券商端灾难保护止损价格距离，0 表示关闭 |
 | `MT5_DEMO_ONLY` | `false` | 是否只允许模拟账户；设为 `true` 时拒绝真实账户交易 |
 | `SIGNAL_MAX_AGE_SECONDS` | `180` | webhook 信号最大有效秒数 |
-| `TRADING_ENABLED_AT_START` | `false` | 启动时是否自动允许交易，不建议开启 |
+| `TRADING_ENABLED_AT_START` | `false` | 数据库尚无已保存开关状态时的首次默认值 |
 
 `.tv-cookie` 已加入 `.gitignore`，不能提交到版本库。如果 Cookie 曾经被提交或泄露，应立即退出 TradingView 会话并重新登录。
 
