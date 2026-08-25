@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from app.alert_template import AlertTemplateBuilder, default_valid_bars, parse_prices
+from app.alert_template import AlertTemplateBuilder, default_valid_bars, parse_prices, valid_bars_for_hours
 from app.errors import TemplateError, ValidationError
 
 
@@ -17,15 +17,25 @@ def strategy_inputs(document: dict) -> dict:
     return document["payload"]["conditions"][0]["series"][0]["inputs"]
 
 
-def test_parse_prices_accepts_whitespace_and_normal_decimals() -> None:
-    assert parse_prices("4600  4620.5\n4660") == [Decimal("4600"), Decimal("4620.5"), Decimal("4660")]
+def test_parse_prices_accepts_common_separators_and_normal_decimals() -> None:
+    assert parse_prices("4600  4620.5\n4660,4680，4700、4720;4740；4760\t4780") == [
+        Decimal("4600"),
+        Decimal("4620.5"),
+        Decimal("4660"),
+        Decimal("4680"),
+        Decimal("4700"),
+        Decimal("4720"),
+        Decimal("4740"),
+        Decimal("4760"),
+        Decimal("4780"),
+    ]
 
 
 @pytest.mark.parametrize(
     ("raw", "message"),
     [
         ("", "至少"),
-        ("1 2 3 4 5 6 7", "最多"),
+        (" ".join(str(value) for value in range(1, 22)), "最多"),
         ("4600abc", "格式"),
         ("-1", "格式"),
         ("0", "大于 0"),
@@ -54,16 +64,26 @@ def test_builder_replaces_prices_switches_name_and_start_time() -> None:
         (True, 4620.5),
         (True, 4660),
     ]
-    assert [(inputs[f"in_{index}"], inputs[f"in_{index + 1}"]) for index in (13, 16, 19)] == [
-        (False, 0),
-        (False, 0),
-        (False, 0),
-    ]
+    assert all(
+        (inputs[f"in_{index}"], inputs[f"in_{index + 1}"]) == (False, 0)
+        for index in range(13, 62, 3)
+    )
     assert inputs["in_2"] == 1787505480000
     assert result["payload"]["name"] == "MT5_AU::GOLD_PRICE::test"
     assert result["payload"]["web_hook"] == "http://127.0.0.1:8000/api/webhooks/tradingview"
     assert (ROOT / "payload.json").read_text(encoding="utf-8") == source_before
     json.dumps(result)
+
+
+def test_builder_supports_twenty_prices() -> None:
+    builder = AlertTemplateBuilder(ROOT / "payload.json")
+    prices = [Decimal(value) for value in range(4600, 4620)]
+
+    result = builder.build(prices, name="twenty-prices", now_ms=1787505555000)
+
+    inputs = strategy_inputs(result)
+    assert [inputs[f"in_{5 + index * 3}"] for index in range(20)] == list(range(4600, 4620))
+    assert all(inputs[f"in_{4 + index * 3}"] is True for index in range(20))
 
 
 def test_webhook_message_is_valid_and_contains_required_placeholders() -> None:
@@ -103,6 +123,55 @@ def test_webhook_message_rejects_missing_placeholders(tmp_path: Path) -> None:
 )
 def test_default_valid_bars_is_one_day(resolution: str, bars: int) -> None:
     assert default_valid_bars(resolution) == bars
+
+
+@pytest.mark.parametrize(
+    ("hours", "resolution", "bars"),
+    [
+        (Decimal("24"), "2", 720),
+        (Decimal("24"), "5", 288),
+        (Decimal("0.5"), "15", 2),
+        (Decimal("1"), "240", 1),
+        (Decimal("1.01"), "60", 2),
+    ],
+)
+def test_valid_bars_for_hours_rounds_up(hours: Decimal, resolution: str, bars: int) -> None:
+    assert valid_bars_for_hours(hours, resolution) == bars
+
+
+def test_valid_bars_for_hours_rejects_more_than_ten_thousand_bars() -> None:
+    with pytest.raises(ValidationError, match="10000"):
+        valid_bars_for_hours(Decimal("200"), "1")
+
+
+def test_builder_accepts_valid_hours() -> None:
+    builder = AlertTemplateBuilder(ROOT / "payload.json")
+
+    result = builder.build(
+        [Decimal("4600")],
+        name="hours-test",
+        valid_hours=Decimal("24"),
+        resolution="5",
+        now_ms=1787582700000,
+    )
+
+    settings = builder.strategy_settings(result)
+    assert settings.valid_bars == 288
+    assert settings.end_time_ms == 1787669100000
+
+
+def test_builder_rejects_valid_hours_and_valid_bars_together() -> None:
+    builder = AlertTemplateBuilder(ROOT / "payload.json")
+
+    with pytest.raises(ValidationError, match="不能同时"):
+        builder.build(
+            [Decimal("4600")],
+            name="conflicting-duration-test",
+            valid_hours=Decimal("24"),
+            valid_bars=288,
+            resolution="5",
+            now_ms=1787582700000,
+        )
 
 
 def test_builder_replaces_strategy_settings_and_aligns_start_time() -> None:

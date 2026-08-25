@@ -5,7 +5,8 @@ const elements = {
   prices: document.querySelector("#prices"),
   alertSide: document.querySelector("#alertSide"),
   alertResolution: document.querySelector("#alertResolution"),
-  validBars: document.querySelector("#validBars"),
+  validHours: document.querySelector("#validHours"),
+  validBarsPreview: document.querySelector("#validBarsPreview"),
   alertEndTime: document.querySelector("#alertEndTime"),
   createButton: document.querySelector("#createButton"),
   refreshButton: document.querySelector("#refreshButton"),
@@ -33,7 +34,6 @@ const elements = {
   clearSignalsButton: document.querySelector("#clearSignalsButton"),
 };
 let pendingCreate = null;
-let validBarsEdited = false;
 const resolutionMinutes = {
   "1": 1,
   "2": 2,
@@ -126,25 +126,33 @@ function formatDate(value) {
   }).format(date);
 }
 
+function formatHours(value) {
+  return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(4)));
+}
+
 function updateAlertEndTime() {
-  const startMs = Date.now();
-  const bars = Number(elements.validBars.value);
+  const hours = Number(elements.validHours.value);
   const minutes = resolutionMinutes[elements.alertResolution.value];
-  if (!Number.isFinite(startMs) || !Number.isInteger(bars) || bars < 1 || !minutes) {
+  if (!Number.isFinite(hours) || hours <= 0 || !minutes) {
+    elements.validBarsPreview.textContent = "—";
     elements.alertEndTime.textContent = "—";
     return;
   }
-  elements.alertEndTime.textContent = formatDate(startMs + bars * minutes * 60_000);
-}
-
-function applyOneDayBarDefault() {
-  const minutes = resolutionMinutes[elements.alertResolution.value];
-  elements.validBars.value = String(Math.ceil((24 * 60) / minutes));
-  updateAlertEndTime();
+  const bars = Math.ceil((hours * 60) / minutes);
+  if (bars > 10000) {
+    elements.validBarsPreview.textContent = "换算后超过 10000 根 K 线";
+    elements.alertEndTime.textContent = "—";
+    return;
+  }
+  const actualHours = (bars * minutes) / 60;
+  elements.validBarsPreview.textContent = `${bars} 根，实际有效 ${formatHours(actualHours)} 小时`;
+  const intervalMs = minutes * 60_000;
+  const alignedStartMs = Math.floor(Date.now() / intervalMs) * intervalMs;
+  elements.alertEndTime.textContent = formatDate(alignedStartMs + bars * intervalMs);
 }
 
 function initializeAlertForm() {
-  applyOneDayBarDefault();
+  updateAlertEndTime();
 }
 
 function appendCell(row, value, className = "") {
@@ -293,7 +301,9 @@ function renderAlerts(alerts) {
     appendCell(row, alert.side || "—");
     appendCell(
       row,
-      alert.resolution ? `${alert.resolution} 分钟${alert.valid_bars ? ` / ${alert.valid_bars} 根` : ""}` : "—",
+      alert.resolution
+        ? `${alert.resolution} 分钟${alert.valid_bars ? ` / ${formatHours((alert.valid_bars * Number(alert.resolution)) / 60)} 小时` : ""}`
+        : "—",
     );
     appendCell(row, formatDate(alert.end_time_ms));
     appendCell(row, formatDate(alert.create_time));
@@ -339,16 +349,22 @@ async function createAlert(event) {
     elements.prices.focus();
     return;
   }
-  const validBars = Number(elements.validBars.value);
-  if (!Number.isInteger(validBars) || validBars < 1 || validBars > 10000) {
-    showNotice("有效 K 线数必须是 1～10000 的整数", "error");
+  const validHours = Number(elements.validHours.value);
+  const minutes = resolutionMinutes[elements.alertResolution.value];
+  const convertedBars = Math.ceil((validHours * 60) / minutes);
+  if (!Number.isFinite(validHours) || validHours <= 0 || validHours > 40000) {
+    showNotice("有效时长必须是大于 0 且不超过 40000 的小时数", "error");
+    return;
+  }
+  if (convertedBars > 10000) {
+    showNotice("有效时长过长，换算后 K 线数不能超过 10000", "error");
     return;
   }
 
   const alertConfig = {
     prices,
     side: elements.alertSide.value,
-    valid_bars: validBars,
+    valid_hours: validHours,
     resolution: elements.alertResolution.value,
   };
   const requestKey = JSON.stringify(alertConfig);
@@ -364,8 +380,9 @@ async function createAlert(event) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ...alertConfig, request_id: pendingCreate.requestId }),
     });
+    const actualHours = (result.alert.valid_bars * Number(result.alert.resolution)) / 60;
     const message = result.created
-      ? `警报创建成功：${result.alert.side}，${result.alert.resolution} 分钟，${result.alert.valid_bars} 根 K 线`
+      ? `警报创建成功：${result.alert.side}，${result.alert.resolution} 分钟，实际有效 ${formatHours(actualHours)} 小时（${result.alert.valid_bars} 根 K 线）`
       : "该请求对应的警报已经存在，未重复创建";
     showNotice(message);
     pendingCreate = null;
@@ -435,17 +452,8 @@ async function refreshDashboard() {
 }
 
 elements.form.addEventListener("submit", createAlert);
-elements.alertResolution.addEventListener("change", () => {
-  if (!validBarsEdited) {
-    applyOneDayBarDefault();
-  } else {
-    updateAlertEndTime();
-  }
-});
-elements.validBars.addEventListener("input", () => {
-  validBarsEdited = true;
-  updateAlertEndTime();
-});
+elements.alertResolution.addEventListener("change", updateAlertEndTime);
+elements.validHours.addEventListener("input", updateAlertEndTime);
 elements.refreshButton.addEventListener("click", () => {
   hideNotice();
   refreshDashboard();

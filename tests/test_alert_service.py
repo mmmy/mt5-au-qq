@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from decimal import Decimal
 from pathlib import Path
 from uuid import UUID
 
@@ -84,6 +85,23 @@ def test_create_builds_payload_and_returns_normalized_prices() -> None:
     assert result.alert.name == PREFIX + "aaaaaaaaaaaa4aaa8aaaaaaaaaaaaaaa"
     assert len(client.created_payloads) == 1
     assert client.created_payloads[0]["payload"]["web_hook"] == "https://trade.example.com/api/webhooks/tradingview"
+
+
+def test_create_converts_valid_hours_and_returns_actual_bars() -> None:
+    client = FakeTradingViewClient(create_id=56)
+    service = build_service(client)
+
+    result = asyncio.run(
+        service.create_alert(
+            "4600",
+            UUID("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"),
+            valid_hours=Decimal("1"),
+            resolution="240",
+        )
+    )
+
+    assert result.alert.valid_bars == 1
+    assert result.alert.end_time_ms - result.alert.start_time_ms == 4 * 60 * 60 * 1000
 
 
 def test_create_is_idempotent_for_existing_request_id() -> None:

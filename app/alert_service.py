@@ -48,6 +48,7 @@ class AlertService:
         webhook_url: str | None = None,
         side: str = "自动",
         valid_bars: int | None = None,
+        valid_hours: Decimal | None = None,
         start_time_ms: int | None = None,
         resolution: str = "2",
     ) -> CreateAlertResponse:
@@ -72,6 +73,7 @@ class AlertService:
                 webhook_url=effective_webhook_url,
                 side=side,
                 valid_bars=valid_bars,
+                valid_hours=valid_hours,
                 start_time_ms=start_time_ms,
                 resolution=resolution,
             )

@@ -112,6 +112,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             webhook_url=webhook_url,
             side=data.side,
             valid_bars=data.valid_bars,
+            valid_hours=data.valid_hours,
             start_time_ms=data.start_time_ms,
             resolution=data.resolution,
         )

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from decimal import Decimal
 from enum import StrEnum
 from typing import Any, Literal
 from uuid import UUID, uuid4
@@ -8,9 +9,10 @@ from pydantic import BaseModel, Field
 
 
 class CreateAlertRequest(BaseModel):
-    prices: str = Field(min_length=1, max_length=200)
+    prices: str = Field(min_length=1, max_length=1000)
     side: Literal["自动", "看多", "看空"] = "自动"
     valid_bars: int | None = Field(default=None, ge=1, le=10_000)
+    valid_hours: Decimal | None = Field(default=None, gt=0, le=40_000)
     start_time_ms: int | None = Field(default=None, gt=0)
     resolution: Literal["1", "2", "3", "5", "15", "30", "60", "120", "240"] = "2"
     request_id: UUID = Field(default_factory=uuid4)

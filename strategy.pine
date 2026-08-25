@@ -33,6 +33,62 @@ enablePrice6 = input.bool(true, title = '开启', inline = 'price6')
 price6 = input.price(0, title = '价格6', inline = "price6")
 p6Color = input.color(color.blue, title = '', inline = "price6")
 
+enablePrice7 = input.bool(true, title = '开启', inline = 'price7')
+price7 = input.price(0, title = '价格7', inline = "price7")
+p7Color = input.color(color.blue, title = '', inline = "price7")
+
+enablePrice8 = input.bool(true, title = '开启', inline = 'price8')
+price8 = input.price(0, title = '价格8', inline = "price8")
+p8Color = input.color(color.blue, title = '', inline = "price8")
+
+enablePrice9 = input.bool(true, title = '开启', inline = 'price9')
+price9 = input.price(0, title = '价格9', inline = "price9")
+p9Color = input.color(color.blue, title = '', inline = "price9")
+
+enablePrice10 = input.bool(true, title = '开启', inline = 'price10')
+price10 = input.price(0, title = '价格10', inline = "price10")
+p10Color = input.color(color.blue, title = '', inline = "price10")
+
+enablePrice11 = input.bool(true, title = '开启', inline = 'price11')
+price11 = input.price(0, title = '价格11', inline = "price11")
+p11Color = input.color(color.blue, title = '', inline = "price11")
+
+enablePrice12 = input.bool(true, title = '开启', inline = 'price12')
+price12 = input.price(0, title = '价格12', inline = "price12")
+p12Color = input.color(color.blue, title = '', inline = "price12")
+
+enablePrice13 = input.bool(true, title = '开启', inline = 'price13')
+price13 = input.price(0, title = '价格13', inline = "price13")
+p13Color = input.color(color.blue, title = '', inline = "price13")
+
+enablePrice14 = input.bool(true, title = '开启', inline = 'price14')
+price14 = input.price(0, title = '价格14', inline = "price14")
+p14Color = input.color(color.blue, title = '', inline = "price14")
+
+enablePrice15 = input.bool(true, title = '开启', inline = 'price15')
+price15 = input.price(0, title = '价格15', inline = "price15")
+p15Color = input.color(color.blue, title = '', inline = "price15")
+
+enablePrice16 = input.bool(true, title = '开启', inline = 'price16')
+price16 = input.price(0, title = '价格16', inline = "price16")
+p16Color = input.color(color.blue, title = '', inline = "price16")
+
+enablePrice17 = input.bool(true, title = '开启', inline = 'price17')
+price17 = input.price(0, title = '价格17', inline = "price17")
+p17Color = input.color(color.blue, title = '', inline = "price17")
+
+enablePrice18 = input.bool(true, title = '开启', inline = 'price18')
+price18 = input.price(0, title = '价格18', inline = "price18")
+p18Color = input.color(color.blue, title = '', inline = "price18")
+
+enablePrice19 = input.bool(true, title = '开启', inline = 'price19')
+price19 = input.price(0, title = '价格19', inline = "price19")
+p19Color = input.color(color.blue, title = '', inline = "price19")
+
+enablePrice20 = input.bool(true, title = '开启', inline = 'price20')
+price20 = input.price(0, title = '价格20', inline = "price20")
+p20Color = input.color(color.blue, title = '', inline = "price20")
+
 priceDelta = input.float(2, title = '入场价格区间偏离', minval = 0)
 
 fraGroup = '分型'
@@ -89,6 +145,76 @@ var line line6 = na
 if enablePrice6 and na(line6) and price6 > 0
     line6 := line.new(startTime, price6, openEndTime, price6, xloc.bar_time, color = p6Color, width = 2)
     prices.push(price6)
+
+var line line7 = na
+if enablePrice7 and na(line7) and price7 > 0
+    line7 := line.new(startTime, price7, openEndTime, price7, xloc.bar_time, color = p7Color, width = 2)
+    prices.push(price7)
+
+var line line8 = na
+if enablePrice8 and na(line8) and price8 > 0
+    line8 := line.new(startTime, price8, openEndTime, price8, xloc.bar_time, color = p8Color, width = 2)
+    prices.push(price8)
+
+var line line9 = na
+if enablePrice9 and na(line9) and price9 > 0
+    line9 := line.new(startTime, price9, openEndTime, price9, xloc.bar_time, color = p9Color, width = 2)
+    prices.push(price9)
+
+var line line10 = na
+if enablePrice10 and na(line10) and price10 > 0
+    line10 := line.new(startTime, price10, openEndTime, price10, xloc.bar_time, color = p10Color, width = 2)
+    prices.push(price10)
+
+var line line11 = na
+if enablePrice11 and na(line11) and price11 > 0
+    line11 := line.new(startTime, price11, openEndTime, price11, xloc.bar_time, color = p11Color, width = 2)
+    prices.push(price11)
+
+var line line12 = na
+if enablePrice12 and na(line12) and price12 > 0
+    line12 := line.new(startTime, price12, openEndTime, price12, xloc.bar_time, color = p12Color, width = 2)
+    prices.push(price12)
+
+var line line13 = na
+if enablePrice13 and na(line13) and price13 > 0
+    line13 := line.new(startTime, price13, openEndTime, price13, xloc.bar_time, color = p13Color, width = 2)
+    prices.push(price13)
+
+var line line14 = na
+if enablePrice14 and na(line14) and price14 > 0
+    line14 := line.new(startTime, price14, openEndTime, price14, xloc.bar_time, color = p14Color, width = 2)
+    prices.push(price14)
+
+var line line15 = na
+if enablePrice15 and na(line15) and price15 > 0
+    line15 := line.new(startTime, price15, openEndTime, price15, xloc.bar_time, color = p15Color, width = 2)
+    prices.push(price15)
+
+var line line16 = na
+if enablePrice16 and na(line16) and price16 > 0
+    line16 := line.new(startTime, price16, openEndTime, price16, xloc.bar_time, color = p16Color, width = 2)
+    prices.push(price16)
+
+var line line17 = na
+if enablePrice17 and na(line17) and price17 > 0
+    line17 := line.new(startTime, price17, openEndTime, price17, xloc.bar_time, color = p17Color, width = 2)
+    prices.push(price17)
+
+var line line18 = na
+if enablePrice18 and na(line18) and price18 > 0
+    line18 := line.new(startTime, price18, openEndTime, price18, xloc.bar_time, color = p18Color, width = 2)
+    prices.push(price18)
+
+var line line19 = na
+if enablePrice19 and na(line19) and price19 > 0
+    line19 := line.new(startTime, price19, openEndTime, price19, xloc.bar_time, color = p19Color, width = 2)
+    prices.push(price19)
+
+var line line20 = na
+if enablePrice20 and na(line20) and price20 > 0
+    line20 := line.new(startTime, price20, openEndTime, price20, xloc.bar_time, color = p20Color, width = 2)
+    prices.push(price20)
 // 将价格从小到大排列
 array.sort(prices, order.ascending)
 

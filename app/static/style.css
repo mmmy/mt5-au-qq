@@ -335,20 +335,22 @@ h2 {
   color: var(--accent-hover);
 }
 
-.input-row input {
+.input-row textarea {
   width: 100%;
   min-width: 0;
-  height: 46px;
-  padding: 0 14px;
+  min-height: 86px;
+  padding: 12px 14px;
   border: 1px solid var(--border);
   border-radius: 9px;
   outline: none;
   background: var(--bg);
   color: var(--text);
+  font: inherit;
+  resize: vertical;
   transition: border-color 140ms, box-shadow 140ms;
 }
 
-.input-row input:focus {
+.input-row textarea:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px rgb(214 168 70 / 14%);
 }

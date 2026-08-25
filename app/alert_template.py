@@ -5,21 +5,17 @@ import math
 import re
 import time
 from dataclasses import dataclass
-from decimal import Decimal, InvalidOperation
+from decimal import ROUND_CEILING, Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
 from app.errors import TemplateError, ValidationError
 
 
-PRICE_INPUTS: tuple[tuple[str, str], ...] = (
-    ("in_4", "in_5"),
-    ("in_7", "in_8"),
-    ("in_10", "in_11"),
-    ("in_13", "in_14"),
-    ("in_16", "in_17"),
-    ("in_19", "in_20"),
+PRICE_INPUTS: tuple[tuple[str, str], ...] = tuple(
+    (f"in_{4 + index * 3}", f"in_{5 + index * 3}") for index in range(20)
 )
+PRICE_SEPARATOR_PATTERN = re.compile(r"[\s,，、;；]+")
 DECIMAL_PATTERN = re.compile(r"\d+(?:\.\d+)?\Z")
 REQUIRED_WEBHOOK_PLACEHOLDERS = {
     "side": "{{strategy.order.action}}",
@@ -59,12 +55,30 @@ def default_valid_bars(resolution: str) -> int:
     return math.ceil(24 * 60 / minutes)
 
 
+def valid_bars_for_hours(valid_hours: Decimal, resolution: str) -> int:
+    minutes = RESOLUTION_MINUTES.get(resolution)
+    if minutes is None:
+        raise ValidationError(f"不支持的警报时间级别：{resolution}")
+    if isinstance(valid_hours, bool):
+        raise ValidationError("有效时长必须大于 0")
+    try:
+        hours = Decimal(str(valid_hours))
+    except InvalidOperation as exc:
+        raise ValidationError("有效时长格式不正确") from exc
+    if not hours.is_finite() or hours <= 0:
+        raise ValidationError("有效时长必须大于 0")
+    bars = int((hours * 60 / minutes).to_integral_value(rounding=ROUND_CEILING))
+    if bars > 10_000:
+        raise ValidationError("有效时长过长，换算后 K 线数不能超过 10000")
+    return bars
+
+
 def parse_prices(raw_prices: str) -> list[Decimal]:
-    parts = raw_prices.strip().split()
+    parts = [part for part in PRICE_SEPARATOR_PATTERN.split(raw_prices.strip()) if part]
     if not parts:
         raise ValidationError("请至少输入一个价格")
     if len(parts) > len(PRICE_INPUTS):
-        raise ValidationError("当前策略最多支持 6 个价格")
+        raise ValidationError(f"当前策略最多支持 {len(PRICE_INPUTS)} 个价格")
 
     prices: list[Decimal] = []
     seen: set[Decimal] = set()
@@ -115,6 +129,7 @@ class AlertTemplateBuilder:
         webhook_url: str | None = None,
         side: str = "自动",
         valid_bars: int | None = None,
+        valid_hours: Decimal | None = None,
         start_time_ms: int | None = None,
         resolution: str | None = None,
         now_ms: int | None = None,
@@ -132,6 +147,7 @@ class AlertTemplateBuilder:
             payload,
             side=side,
             valid_bars=valid_bars,
+            valid_hours=valid_hours,
             start_time_ms=start_time_ms,
             resolution=resolution,
             now_ms=now_ms,
@@ -249,6 +265,7 @@ class AlertTemplateBuilder:
         *,
         side: str,
         valid_bars: int | None,
+        valid_hours: Decimal | None,
         start_time_ms: int | None,
         resolution: str | None,
         now_ms: int | None,
@@ -263,7 +280,12 @@ class AlertTemplateBuilder:
         minutes = RESOLUTION_MINUTES.get(selected_resolution)
         if minutes is None:
             raise ValidationError(f"不支持的警报时间级别：{selected_resolution}")
-        selected_bars = default_valid_bars(selected_resolution) if valid_bars is None else valid_bars
+        if valid_hours is not None and valid_bars is not None:
+            raise ValidationError("有效时长和有效 K 线数不能同时提供")
+        if valid_hours is not None:
+            selected_bars = valid_bars_for_hours(valid_hours, selected_resolution)
+        else:
+            selected_bars = default_valid_bars(selected_resolution) if valid_bars is None else valid_bars
         if isinstance(selected_bars, bool) or not isinstance(selected_bars, int) or not 1 <= selected_bars <= 10_000:
             raise ValidationError("有效 K 线数必须是 1～10000 的整数")
         current_ms = now_ms if now_ms is not None else time.time_ns() // 1_000_000
@@ -274,7 +296,7 @@ class AlertTemplateBuilder:
         aligned_start_ms = selected_start_ms // interval_ms * interval_ms
         end_time_ms = aligned_start_ms + selected_bars * interval_ms
         if end_time_ms <= current_ms:
-            raise ValidationError("警报结束时间已经过去，请调整开始时间或有效 K 线数")
+            raise ValidationError("警报结束时间已经过去，请调整开始时间或有效时长")
         return AlertStrategySettings(
             side=side,
             valid_bars=selected_bars,

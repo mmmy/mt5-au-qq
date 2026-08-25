@@ -85,7 +85,7 @@
         <div class="panel-heading">
           <div>
             <h2 id="createTitle">创建警报</h2>
-            <p>输入 1～6 个价格，使用空格分隔。</p>
+            <p>输入 1～20 个价格，可使用空格、回车或逗号分隔。</p>
           </div>
         </div>
         <form id="createForm" class="create-form">
@@ -113,27 +113,28 @@
               </select>
             </div>
             <div class="form-field">
-              <label for="validBars">有效 K 线数</label>
-              <input id="validBars" name="valid_bars" type="number" min="1" max="10000" step="1" value="720" required>
+              <label for="validHours">有效时长（小时）</label>
+              <input id="validHours" name="valid_hours" type="number" min="0.01" max="40000" step="0.01" value="24" required>
             </div>
           </div>
 
           <label for="prices">价格</label>
           <div class="input-row">
-            <input
+            <textarea
               id="prices"
               name="prices"
-              type="text"
               inputmode="decimal"
               autocomplete="off"
-              placeholder="例如：4600 4620.5 4660"
-              maxlength="200"
+              placeholder="例如：4600, 4620.5, 4660"
+              maxlength="1000"
+              rows="3"
               required
-            >
+            ></textarea>
             <button id="createButton" class="button button-primary" type="submit">创建警报</button>
           </div>
-          <p class="form-help">价格必须大于 0，不能重复；策略最多支持六个价格。</p>
-          <p class="form-help">开始时间由后端自动设为当前时间；有效期按自然时间折算，包含休市时间。预计结束：<strong id="alertEndTime">—</strong></p>
+          <p class="form-help">价格必须大于 0，不能重复；最多支持 20 个价格。支持空格、回车、制表符、中英文逗号或分号分隔。</p>
+          <p class="form-help">小时数会按当前周期向上换算为 K 线数：<strong id="validBarsPreview">—</strong></p>
+          <p class="form-help">开始时间由后端自动设为当前 K 线开始时间；有效期按自然时间计算，包含休市时间。预计结束：<strong id="alertEndTime">—</strong></p>
         </form>
       </section>
 
