@@ -199,7 +199,9 @@ class AlertTemplateBuilder:
 
     def _load_template(self) -> dict[str, Any]:
         try:
-            data = json.loads(self.payload_file.read_text(encoding="utf-8"))
+            # utf-8-sig accepts regular UTF-8 and transparently strips the BOM
+            # written by editors such as Windows Notepad.
+            data = json.loads(self.payload_file.read_text(encoding="utf-8-sig"))
         except FileNotFoundError as exc:
             raise TemplateError(f"找不到警报模板：{self.payload_file}") from exc
         except (OSError, json.JSONDecodeError) as exc:

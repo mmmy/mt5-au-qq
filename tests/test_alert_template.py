@@ -79,6 +79,16 @@ def test_webhook_message_is_valid_and_contains_required_placeholders() -> None:
     assert message["id"] == "{{strategy.order.id}}"
 
 
+def test_builder_accepts_utf8_bom(tmp_path: Path) -> None:
+    payload_file = tmp_path / "payload.json"
+    source = (ROOT / "payload.json").read_bytes()
+    payload_file.write_bytes(b"\xef\xbb\xbf" + source)
+
+    message = json.loads(AlertTemplateBuilder(payload_file).webhook_message())
+
+    assert message["name"] == "AU-BOT"
+
+
 def test_webhook_message_rejects_missing_placeholders(tmp_path: Path) -> None:
     payload_file = tmp_path / "payload.json"
     payload_file.write_text(json.dumps({"payload": {"message": "{}"}}), encoding="utf-8")
