@@ -33,6 +33,14 @@ from app.tradingview import TradingViewClient
 from app.trading_service import TradingService
 
 
+def cache_control_for_path(path: str) -> str | None:
+    if path == "/" or path == "/index.html" or path.startswith("/api/"):
+        return "no-store"
+    if path.startswith("/static/"):
+        return "no-cache, must-revalidate"
+    return None
+
+
 def resolve_webhook_url(request: Request, configured_url: str | None) -> str:
     if configured_url:
         return configured_url
@@ -91,6 +99,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app = FastAPI(title="MT5 AU QQ", version="0.1.0", lifespan=lifespan)
     app.state.settings = app_settings
+
+    @app.middleware("http")
+    async def add_cache_control_header(request: Request, call_next):
+        response = await call_next(request)
+        cache_control = cache_control_for_path(request.url.path)
+        if cache_control:
+            response.headers["Cache-Control"] = cache_control
+        return response
 
     @app.exception_handler(AppError)
     async def handle_app_error(_request: Request, error: AppError) -> JSONResponse:
