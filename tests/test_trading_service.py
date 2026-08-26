@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -128,6 +129,50 @@ def test_webhook_rejects_expired_signal(tmp_path: Path) -> None:
 
     with pytest.raises(ValidationError, match="过期"):
         service.ingest_webhook(make_webhook(timestamp="1000"))
+
+
+def test_webhook_accepts_tradingview_iso_timestamp(tmp_path: Path) -> None:
+    repository = TradeRepository(tmp_path / "trading.db")
+    repository.initialize()
+    service = TradingService(
+        repository,
+        FakeGateway(),  # type: ignore[arg-type]
+        webhook_url="http://127.0.0.1:8000/api/webhooks/tradingview",
+        symbol="XAUUSD",
+        volume=0.01,
+        max_volume=0.1,
+        emergency_sl_distance=20,
+        demo_only=True,
+        signal_max_age_seconds=180,
+        enabled_at_start=False,
+    )
+    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    response = service.ingest_webhook(make_webhook(timestamp=timestamp))
+
+    assert response.status == "blocked"
+    assert response.accepted is False
+
+
+@pytest.mark.parametrize("timestamp", ["not-a-time", "2026-08-26T09:00:00", "nan"])
+def test_webhook_rejects_invalid_timestamp(timestamp: str, tmp_path: Path) -> None:
+    repository = TradeRepository(tmp_path / "trading.db")
+    repository.initialize()
+    service = TradingService(
+        repository,
+        FakeGateway(),  # type: ignore[arg-type]
+        webhook_url="http://127.0.0.1:8000/api/webhooks/tradingview",
+        symbol="XAUUSD",
+        volume=0.01,
+        max_volume=0.1,
+        emergency_sl_distance=20,
+        demo_only=True,
+        signal_max_age_seconds=180,
+        enabled_at_start=False,
+    )
+
+    with pytest.raises(ValidationError, match="timestamp 格式不正确"):
+        service.ingest_webhook(make_webhook(timestamp=timestamp))
 
 
 def test_trading_switch_persists_across_restarts(tmp_path: Path) -> None:

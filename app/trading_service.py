@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import math
 import queue
 import threading
 import time
@@ -312,9 +313,27 @@ class TradingService:
     def _validate_signal_age(self, raw_timestamp: str) -> None:
         try:
             numeric = float(raw_timestamp)
-        except (TypeError, ValueError) as exc:
-            raise ValidationError("TradingView timestamp 格式不正确", code="INVALID_SIGNAL_TIMESTAMP") from exc
-        timestamp_seconds = numeric / 1000 if numeric > 10_000_000_000 else numeric
+        except (TypeError, ValueError):
+            try:
+                normalized = raw_timestamp.strip()
+                if normalized.endswith(("Z", "z")):
+                    normalized = normalized[:-1] + "+00:00"
+                parsed = datetime.fromisoformat(normalized)
+                if parsed.tzinfo is None:
+                    raise ValueError("timestamp timezone is missing")
+                timestamp_seconds = parsed.timestamp()
+            except (AttributeError, OSError, OverflowError, ValueError) as exc:
+                raise ValidationError(
+                    "TradingView timestamp 格式不正确",
+                    code="INVALID_SIGNAL_TIMESTAMP",
+                ) from exc
+        else:
+            if not math.isfinite(numeric):
+                raise ValidationError(
+                    "TradingView timestamp 格式不正确",
+                    code="INVALID_SIGNAL_TIMESTAMP",
+                )
+            timestamp_seconds = numeric / 1000 if numeric > 10_000_000_000 else numeric
         age = time.time() - timestamp_seconds
         if age > self.signal_max_age_seconds:
             raise ValidationError("TradingView 信号已经过期", code="EXPIRED_SIGNAL")
