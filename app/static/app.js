@@ -20,6 +20,8 @@ const elements = {
   mt5ConnectionStatus: document.querySelector("#mt5ConnectionStatus"),
   algoTradingStatus: document.querySelector("#algoTradingStatus"),
   accountStatus: document.querySelector("#accountStatus"),
+  accountModeHelp: document.querySelector("#accountModeHelp"),
+  accountModeCurrent: document.querySelector("#accountModeCurrent"),
   quoteStatus: document.querySelector("#quoteStatus"),
   positionStatus: document.querySelector("#positionStatus"),
   webhookUrl: document.querySelector("#webhookUrl"),
@@ -228,14 +230,13 @@ async function loadTradingStatus() {
   try {
     const data = await apiRequest("/api/trading/status");
     const mt5 = data.mt5;
+    const accountTradeMode = mt5.account_trade_mode || (mt5.demo_account ? "demo" : "unknown");
     setStatus(elements.tradingEnabledStatus, data.enabled ? "已启用" : "已停止", data.enabled);
     setStatus(elements.mt5ConnectionStatus, mt5.connected ? "已连接" : "未连接", mt5.connected);
     setStatus(elements.algoTradingStatus, mt5.terminal_trade_allowed ? "已允许" : "未开启", mt5.terminal_trade_allowed);
-    setStatus(
-      elements.accountStatus,
-      `${accountTradeModeLabel(mt5.account_trade_mode)} · ${mt5.server || "未知服务器"} · ${mt5.login_masked || "未知账号"}`,
-      mt5.account_trade_mode === "demo",
-    );
+    elements.accountStatus.textContent = `${accountTradeModeLabel(accountTradeMode)} · ${mt5.server || "未知服务器"} · ${mt5.login_masked || "未知账号"}`;
+    elements.accountStatus.className = accountTradeMode === "unknown" ? "bad" : "";
+    elements.accountModeCurrent.textContent = `当前：${accountTradeModeLabel(accountTradeMode)}`;
     elements.quoteStatus.textContent = mt5.bid && mt5.ask ? `${mt5.bid} / ${mt5.ask}` : "无报价";
     elements.quoteStatus.className = mt5.bid && mt5.ask ? "good" : "bad";
     elements.positionStatus.textContent = `多 ${mt5.owned_long_positions} / 空 ${mt5.owned_short_positions}`;
@@ -508,6 +509,11 @@ elements.clearSignalsButton.addEventListener("click", clearSignals);
 for (const button of elements.manualActionButtons) {
   button.addEventListener("click", () => submitManualAction(button));
 }
+document.addEventListener("click", (event) => {
+  if (elements.accountModeHelp.open && !elements.accountModeHelp.contains(event.target)) {
+    elements.accountModeHelp.open = false;
+  }
+});
 
 initializeAlertForm();
 refreshDashboard();

@@ -46,7 +46,23 @@
           </div>
           <div class="status-card">
             <span>账户</span>
-            <strong id="accountStatus">读取中</strong>
+            <div class="account-status-row">
+              <strong id="accountStatus">读取中</strong>
+              <details id="accountModeHelp" class="account-mode-help">
+                <summary aria-label="查看 MT5 账户类型说明" title="账户类型说明">?</summary>
+                <div class="account-mode-popover" role="note">
+                  <p class="account-mode-title">MT5 账户技术类型</p>
+                  <p id="accountModeCurrent" class="account-mode-current">当前：读取中</p>
+                  <ul>
+                    <li><b>Demo</b>：MT5 标准模拟账户，通常使用虚拟资金。</li>
+                    <li><b>Contest</b>：竞赛或考核账户，常见于挑战和评估环境。</li>
+                    <li><b>Real</b>：MT5 技术上标记为真实模式；Prop Firm 仍可能使用模拟资金。</li>
+                    <li><b>Unknown</b>：未连接账户，或 MT5 返回了无法识别的类型。</li>
+                  </ul>
+                  <p class="account-mode-note">资金是否为真实资金，应以账户服务商的说明为准。</p>
+                </div>
+              </details>
+            </div>
           </div>
           <div class="status-card">
             <span>XAUUSD 报价</span>
