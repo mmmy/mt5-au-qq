@@ -204,6 +204,15 @@ function signalStatusLabel(status) {
   }[status] || status;
 }
 
+function accountTradeModeLabel(mode) {
+  return {
+    demo: "Demo 模式",
+    contest: "Contest / 考核模式",
+    real: "Real 技术模式",
+    unknown: "账户模式未知",
+  }[mode] || "账户模式未知";
+}
+
 async function loadTradingViewSetup() {
   try {
     const data = await apiRequest("/api/tradingview/setup");
@@ -224,8 +233,8 @@ async function loadTradingStatus() {
     setStatus(elements.algoTradingStatus, mt5.terminal_trade_allowed ? "已允许" : "未开启", mt5.terminal_trade_allowed);
     setStatus(
       elements.accountStatus,
-      mt5.demo_account ? `模拟 · ${mt5.login_masked || ""}` : "非模拟账户",
-      mt5.demo_account,
+      `${accountTradeModeLabel(mt5.account_trade_mode)} · ${mt5.server || "未知服务器"} · ${mt5.login_masked || "未知账号"}`,
+      mt5.account_trade_mode === "demo",
     );
     elements.quoteStatus.textContent = mt5.bid && mt5.ask ? `${mt5.bid} / ${mt5.ask}` : "无报价";
     elements.quoteStatus.className = mt5.bid && mt5.ask ? "good" : "bad";
@@ -239,7 +248,7 @@ async function loadTradingStatus() {
     }
     elements.tradingHelp.textContent = mt5.error
       ? mt5.error
-      : `固定手数 ${data.volume}，灾难保护止损距离 ${data.emergency_sl_distance}，开关状态已持久化。`;
+      : `固定手数 ${data.volume}，灾难保护止损距离 ${data.emergency_sl_distance}。账户模式由 MT5 服务器返回；Prop Firm 模拟资金账户可能显示为 Contest 或 Real 技术模式。`;
   } catch (error) {
     elements.tradingToggle.disabled = false;
     setStatus(elements.mt5ConnectionStatus, "读取失败", false);
@@ -441,7 +450,7 @@ async function toggleTrading(enabled) {
 
 async function submitManualAction(button) {
   const action = button.dataset.tradeAction;
-  const confirmed = globalThis.confirm(`确定执行“${actionLabel(action)}”吗？将使用程序配置的固定手数操作模拟账户。`);
+  const confirmed = globalThis.confirm(`确定执行“${actionLabel(action)}”吗？将使用程序配置的固定手数操作当前 MT5 账户。`);
   if (!confirmed) {
     return;
   }

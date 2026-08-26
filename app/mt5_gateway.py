@@ -14,6 +14,20 @@ from app.models import Mt5Status, TradeAction
 # builds omit the SYMBOL_FILLING_* capability flags returned by symbol_info.
 SYMBOL_FILLING_FOK_FLAG = 1
 SYMBOL_FILLING_IOC_FLAG = 2
+ACCOUNT_TRADE_MODE_NAMES = {
+    mt5.ACCOUNT_TRADE_MODE_DEMO: "demo",
+    mt5.ACCOUNT_TRADE_MODE_CONTEST: "contest",
+    mt5.ACCOUNT_TRADE_MODE_REAL: "real",
+}
+
+
+def account_trade_mode_name(account: Any | None) -> str:
+    if account is None:
+        return "unknown"
+    try:
+        return ACCOUNT_TRADE_MODE_NAMES.get(int(account.trade_mode), "unknown")
+    except (AttributeError, TypeError, ValueError):
+        return "unknown"
 
 
 class Mt5ExecutionError(RuntimeError):
@@ -68,13 +82,15 @@ class Mt5Gateway:
             tick = mt5.symbol_info_tick(self.symbol) if symbol_info else None
             positions = self._owned_positions()
             login = str(account.login) if account else ""
+            account_trade_mode = account_trade_mode_name(account)
             return Mt5Status(
                 initialized=True,
                 connected=bool(terminal and terminal.connected),
                 terminal_trade_allowed=bool(terminal and terminal.trade_allowed),
                 account_trade_allowed=bool(account and account.trade_allowed),
                 account_trade_expert=bool(account and account.trade_expert),
-                demo_account=bool(account and account.trade_mode == mt5.ACCOUNT_TRADE_MODE_DEMO),
+                demo_account=account_trade_mode == "demo",
+                account_trade_mode=account_trade_mode,
                 server=account.server if account else None,
                 login_masked=("*" * max(len(login) - 4, 0) + login[-4:]) if login else None,
                 symbol=self.symbol,
@@ -92,6 +108,7 @@ class Mt5Gateway:
                 account_trade_allowed=False,
                 account_trade_expert=False,
                 demo_account=False,
+                account_trade_mode="unknown",
                 symbol=self.symbol,
                 symbol_available=False,
                 error=str(exc),

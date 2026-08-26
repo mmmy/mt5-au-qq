@@ -121,6 +121,7 @@ class Mt5Status(BaseModel):
     account_trade_allowed: bool
     account_trade_expert: bool
     demo_account: bool
+    account_trade_mode: Literal["demo", "contest", "real", "unknown"] = "unknown"
     server: str | None = None
     login_masked: str | None = None
     symbol: str

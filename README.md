@@ -15,6 +15,7 @@
 - 单一 MT5 工作线程串行执行交易
 - 默认仅允许模拟账户，使用固定小手数和独立 magic number
 - 页面展示 MT5 状态、本机 webhook URL、交易总开关和手动测试按钮，交易开关状态会持久化
+- 显示 MT5 返回的完整账户模式（Demo、Contest/考核、Real 技术模式）及服务器和脱敏账号
 
 ## 安装和运行
 
@@ -71,7 +72,7 @@ Copy-Item .env.example .env
 | `MT5_MAGIC` | `26082301` | 本程序仓位标识 |
 | `MT5_DEVIATION` | `20` | 下单允许偏差点数 |
 | `MT5_EMERGENCY_SL_DISTANCE` | `20` | 券商端灾难保护止损价格距离，0 表示关闭 |
-| `MT5_DEMO_ONLY` | `false` | 是否只允许模拟账户；设为 `true` 时拒绝真实账户交易 |
+| `MT5_DEMO_ONLY` | `false` | 是否只允许 MT5 技术类型为 Demo 的账户；Prop Firm 模拟资金账户如被标记为 Contest/Real，设为 `true` 后也会被拒绝 |
 | `SIGNAL_MAX_AGE_SECONDS` | `180` | webhook 信号最大有效秒数 |
 | `TRADING_ENABLED_AT_START` | `false` | 数据库尚无已保存开关状态时的首次默认值 |
 
