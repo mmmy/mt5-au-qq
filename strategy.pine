@@ -99,26 +99,26 @@ showFractal = input.bool(false, title = '显示分型信号', group = fraGroup)
 
 pinbarGroup = 'pinbar'
 enablePinbar_5m = input.bool(true, title = '5m启用', group = pinbarGroup, inline = pinbarGroup)
-enablePinbar = input.bool(true, title = '2m启用', group = pinbarGroup, inline = pinbarGroup)
+enablePinbar = input.bool(false, title = '2m启用', group = pinbarGroup, inline = pinbarGroup)
 showPinbar = input.bool(false, title = "显示pinbar信号", group = pinbarGroup)
 r1 = input.float(0.7, title = "影线最小占比", step=0.1, group = pinbarGroup)
 r2 = input.float(0.2, title = "短影线最大占比", step=0.1, group = pinbarGroup)
 
 pinbarMoreGroup = 'pinbar more'
 enablePinbarMore_5m = input.bool(true, title = '5m启用', group = pinbarMoreGroup, inline = pinbarMoreGroup)
-enablePinbarMore = input.bool(true, title = '2m启用', group = pinbarMoreGroup, inline = pinbarMoreGroup)
+enablePinbarMore = input.bool(false, title = '2m启用', group = pinbarMoreGroup, inline = pinbarMoreGroup)
 showPinbarMore = input.bool(false, title = "显示pinbar more信号", group = pinbarMoreGroup)
 moreR1 = input.float(0.5, title = "影线最小占比", step=0.1, group = pinbarMoreGroup)
 moreR2 = input.float(0.2, title = "短影线最大$", step=0.1, group = pinbarMoreGroup)
 
 insidebarGroup = 'insidebar'
 enableInsideBar_5m = input.bool(true, title = '5m启用', group = insidebarGroup, inline = insidebarGroup)
-enableInsideBar = input.bool(true, title = '2m启用', group = insidebarGroup, inline = insidebarGroup)
+enableInsideBar = input.bool(false, title = '2m启用', group = insidebarGroup, inline = insidebarGroup)
 showInsidebar = input.bool(false, title = "显示insidebar信号", group = insidebarGroup)
 
 tunmoGroup = '吞没'
 enableTunmo_5m = input.bool(true, title = '5m启用', group = tunmoGroup, inline = tunmoGroup)
-enableTunmo = input.bool(true, title = '2m启用', group = tunmoGroup, inline = tunmoGroup)
+enableTunmo = input.bool(false, title = '2m启用', group = tunmoGroup, inline = tunmoGroup)
 showTunmo = input.bool(false, title = "显示吞没信号", group = tunmoGroup)
 useTunmo3 = input.bool(true, title = "启用3k吞没", group = tunmoGroup)
 
@@ -134,108 +134,129 @@ timeFilter = timeStartfilter and timeEndFilter
 
 // 记录所有开启且大于0的价格
 var prices = array.new<float>()
+if barstate.isfirst
+    if enablePrice1 and price1 > 0
+        prices.push(price1)
+    if enablePrice2 and price2 > 0
+        prices.push(price2)
+    if enablePrice3 and price3 > 0
+        prices.push(price3)
+    if enablePrice4 and price4 > 0
+        prices.push(price4)
+    if enablePrice5 and price5 > 0
+        prices.push(price5)
+    if enablePrice6 and price6 > 0
+        prices.push(price6)
+    if enablePrice7 and price7 > 0
+        prices.push(price7)
+    if enablePrice8 and price8 > 0
+        prices.push(price8)
+    if enablePrice9 and price9 > 0
+        prices.push(price9)
+    if enablePrice10 and price10 > 0
+        prices.push(price10)
+    if enablePrice11 and price11 > 0
+        prices.push(price11)
+    if enablePrice12 and price12 > 0
+        prices.push(price12)
+    if enablePrice13 and price13 > 0
+        prices.push(price13)
+    if enablePrice14 and price14 > 0
+        prices.push(price14)
+    if enablePrice15 and price15 > 0
+        prices.push(price15)
+    if enablePrice16 and price16 > 0
+        prices.push(price16)
+    if enablePrice17 and price17 > 0
+        prices.push(price17)
+    if enablePrice18 and price18 > 0
+        prices.push(price18)
+    if enablePrice19 and price19 > 0
+        prices.push(price19)
+    if enablePrice20 and price20 > 0
+        prices.push(price20)
+    // 将价格从小到大排列
+    array.sort(prices, order.ascending)
 
 var line line1 = na
 if enablePrice1 and na(line1) and price1 > 0
     line1 := line.new(startTime, price1, openEndTime, price1, xloc.bar_time, color = p1Color, width = 2)
-    prices.push(price1)
 
 var line line2 = na
 if enablePrice2 and na(line2) and price2 > 0
     line2 := line.new(startTime, price2, openEndTime, price2, xloc.bar_time, color = p2Color, width = 2)
-    prices.push(price2)
 
 var line line3 = na
 if enablePrice3 and na(line3) and price3 > 0
     line3 := line.new(startTime, price3, openEndTime, price3, xloc.bar_time, color = p3Color, width = 2)
-    prices.push(price3)
 
 var line line4 = na
 if enablePrice4 and na(line4) and price4 > 0
     line4 := line.new(startTime, price4, openEndTime, price4, xloc.bar_time, color = p4Color, width = 2)
-    prices.push(price4)
 
 var line line5 = na
 if enablePrice5 and na(line5) and price5 > 0
     line5 := line.new(startTime, price5, openEndTime, price5, xloc.bar_time, color = p5Color, width = 2)
-    prices.push(price5)
 
 var line line6 = na
 if enablePrice6 and na(line6) and price6 > 0
     line6 := line.new(startTime, price6, openEndTime, price6, xloc.bar_time, color = p6Color, width = 2)
-    prices.push(price6)
 
 var line line7 = na
 if enablePrice7 and na(line7) and price7 > 0
     line7 := line.new(startTime, price7, openEndTime, price7, xloc.bar_time, color = p7Color, width = 2)
-    prices.push(price7)
 
 var line line8 = na
 if enablePrice8 and na(line8) and price8 > 0
     line8 := line.new(startTime, price8, openEndTime, price8, xloc.bar_time, color = p8Color, width = 2)
-    prices.push(price8)
 
 var line line9 = na
 if enablePrice9 and na(line9) and price9 > 0
     line9 := line.new(startTime, price9, openEndTime, price9, xloc.bar_time, color = p9Color, width = 2)
-    prices.push(price9)
 
 var line line10 = na
 if enablePrice10 and na(line10) and price10 > 0
     line10 := line.new(startTime, price10, openEndTime, price10, xloc.bar_time, color = p10Color, width = 2)
-    prices.push(price10)
 
 var line line11 = na
 if enablePrice11 and na(line11) and price11 > 0
     line11 := line.new(startTime, price11, openEndTime, price11, xloc.bar_time, color = p11Color, width = 2)
-    prices.push(price11)
 
 var line line12 = na
 if enablePrice12 and na(line12) and price12 > 0
     line12 := line.new(startTime, price12, openEndTime, price12, xloc.bar_time, color = p12Color, width = 2)
-    prices.push(price12)
 
 var line line13 = na
 if enablePrice13 and na(line13) and price13 > 0
     line13 := line.new(startTime, price13, openEndTime, price13, xloc.bar_time, color = p13Color, width = 2)
-    prices.push(price13)
 
 var line line14 = na
 if enablePrice14 and na(line14) and price14 > 0
     line14 := line.new(startTime, price14, openEndTime, price14, xloc.bar_time, color = p14Color, width = 2)
-    prices.push(price14)
 
 var line line15 = na
 if enablePrice15 and na(line15) and price15 > 0
     line15 := line.new(startTime, price15, openEndTime, price15, xloc.bar_time, color = p15Color, width = 2)
-    prices.push(price15)
 
 var line line16 = na
 if enablePrice16 and na(line16) and price16 > 0
     line16 := line.new(startTime, price16, openEndTime, price16, xloc.bar_time, color = p16Color, width = 2)
-    prices.push(price16)
 
 var line line17 = na
 if enablePrice17 and na(line17) and price17 > 0
     line17 := line.new(startTime, price17, openEndTime, price17, xloc.bar_time, color = p17Color, width = 2)
-    prices.push(price17)
 
 var line line18 = na
 if enablePrice18 and na(line18) and price18 > 0
     line18 := line.new(startTime, price18, openEndTime, price18, xloc.bar_time, color = p18Color, width = 2)
-    prices.push(price18)
 
 var line line19 = na
 if enablePrice19 and na(line19) and price19 > 0
     line19 := line.new(startTime, price19, openEndTime, price19, xloc.bar_time, color = p19Color, width = 2)
-    prices.push(price19)
 
 var line line20 = na
 if enablePrice20 and na(line20) and price20 > 0
     line20 := line.new(startTime, price20, openEndTime, price20, xloc.bar_time, color = p20Color, width = 2)
-    prices.push(price20)
-// 将价格从小到大排列
-array.sort(prices, order.ascending)
 
 bodyHight = math.abs(close - open)
 longBarPriceFilter = open + bodyHight * 0.33333
@@ -313,8 +334,8 @@ upBar = close > open
 downBar = close < open
 
 // 顶底分型
-fractalTop = high[1] > high[2] and low[1] > low[2] and high < high[1] and low < low[1]  and close < open[2] and downBar and close[1] > open[2] and upBar[2] 
-fractalBottom = high[1] < high[2] and low[1] < low[2] and high > high[1] and low > low[1] and close > open[2] and upBar and close[1] < open[2] and downBar[2]
+fractalTop = high[1] > high[2] and low[1] > low[2] and high < high[1] and low < low[1]  and close < open[2] and downBar and close[1] > open[2]// and upBar[2] 
+fractalBottom = high[1] < high[2] and low[1] < low[2] and high > high[1] and low > low[1] and close > open[2] and upBar and close[1] < open[2] //and downBar[2]
 bgcolor(showFractal and fractalTop ? color.new(color.red, 70) : na)
 bgcolor(showFractal and fractalBottom ? color.new(color.green, 70) : na)
 
@@ -350,12 +371,11 @@ tumoShort = (upBar[1] and downBar and open >= close[1] and close < open[1]) or (
 bgcolor(showTunmo and tumoLong ? color.new(color.green, 70) : na)
 bgcolor(showTunmo and tumoShort ? color.new(color.red, 70) : na)
 
+isInLongPirce = not (high < longPriceMin) and not (low > longPriceMax) and longPriceIndex >= 0
+isInShortPrice = not (high < shortPriceMin) and not (low > shortPriceMax) and shortPriceIndex >= 0
 
-[fractalTop_5m, fractalBottom_5m, pinbarUp_5m, pinbarDown_5m, pinbarMore_5m, bullishInsideBar_5m, bearishInsideBar_5m, tumoLong_5m, tumoShort_5m] = request.security('', '5',
-  [fractalTop, fractalBottom, pinbarUp, pinbarDown, pinbarMore, bullishInsideBar, bearishInsideBar, tumoLong, tumoShort], lookahead = barmerge.lookahead_on)
-
-isInLongPirce = not (high < longPriceMin) and not (low > longPriceMax)
-isInShortPrice = not (high < shortPriceMin) and not (low > shortPriceMax)
+[fractalTop_5m, fractalBottom_5m, pinbarUp_5m, pinbarDown_5m, pinbarMore_5m, bullishInsideBar_5m, bearishInsideBar_5m, tumoLong_5m, tumoShort_5m, isInLongPirce_5m, isInShortPrice_5m, isConfrimed_5m] = request.security('', '5',
+  [fractalTop, fractalBottom, pinbarUp, pinbarDown, pinbarMore, bullishInsideBar, bearishInsideBar, tumoLong, tumoShort, isInLongPirce, isInShortPrice, barstate.isconfirmed], lookahead = barmerge.lookahead_off)
 
 fractalBottomSignal = enableFractal and fractalBottom
 fractalTopSignal = enableFractal and fractalTop
@@ -418,14 +438,20 @@ else if enableInsideBar and bearishInsideBar
     shortMsg2 += 'IB'
 else if enableTunmo and tumoShort
     shortMsg2 += '吞没'
+// 生成信号,5m与2m共振
+long_5m = isConfrimed_5m and isInLongPirce_5m and ((enableFractal_5m and fractalBottom_5m) or (enablePinbar_5m and pinbarUp_5m) or (enablePinbarMore_5m and pinbarMore_5m) or (enableInsideBar_5m and bullishInsideBar_5m) or (enableTunmo_5m and tumoLong_5m))
+bsLong_5m = ta.barssince(long_5m)
+longSignal = longSideOn and long_5m and (fractalBottomSignal or pinbarUpSignal or pinbarMoreSignal or bullishInsideBarSignal or tumoLongSignal)
 
-long_5m = (enableFractal_5m and fractalBottom_5m) or (enablePinbar_5m and pinbarUp_5m) or (enablePinbarMore_5m and pinbarMore_5m) or (enableInsideBar_5m and bullishInsideBar_5m) or (enableTunmo_5m and tumoLong_5m)
+short_5m = isConfrimed_5m and isInShortPrice_5m and ((enableFractal_5m and fractalTop_5m) or (enablePinbar_5m and pinbarDown_5m) or (enablePinbarMore_5m and pinbarMore_5m) or (enableInsideBar_5m and bearishInsideBar_5m) or (enableTunmo_5m and tumoShort_5m))
+bsShort_5m = ta.barssince(short_5m)
+shortSignal = shortSideOn and short_5m and (fractalTopSignal or pinbarDownSignal or pinbarMoreSignal or bearishInsideBarSignal or tumoShortSignal)
 
-longSignal = longSideOn and isInLongPirce and long_5m and (fractalBottomSignal or pinbarUpSignal or pinbarMoreSignal or bullishInsideBarSignal or tumoLongSignal)
+bgcolor(color = (longSideOn and long_5m) ? color.new(color.green, 80) : na, title = '5m long')
+bgcolor(color = (shortSideOn and short_5m) ? color.new(color.red, 80) : na, title = '5m long')
 
-short_5m = (enableFractal_5m and fractalTop_5m) or (enablePinbar_5m and pinbarDown_5m) or (enablePinbarMore_5m and pinbarMore_5m) or (enableInsideBar_5m and bearishInsideBar_5m) or (enableTunmo_5m and tumoShort_5m)
-
-shortSignal = (shortSideOn and isInShortPrice and short_5m and (fractalTopSignal or pinbarDownSignal or pinbarMoreSignal or bearishInsideBarSignal or tumoShortSignal))
+plot(bsLong_5m, title = 'bsLong_5m', display = display.data_window)
+plot(bsShort_5m, title = 'bsShort_5m', display = display.data_window)
 
 hasLongPos = strategy.position_size > 0
 hasShortPos = strategy.position_size < 0
@@ -484,13 +510,13 @@ if shortSideOn and hasShortPos
 
 if barstate.isconfirmed
     if longSideOn and not hasLongPos and longSignal
-        openMsg = str.format('{0}-{1}', longMsg1, longMsg2)
+        openMsg = str.format('{0}+{1}', longMsg1, longMsg2)
         strategy.order(id = 'long', qty = posSize, direction = strategy.long, comment = str.format('开仓:{0}', openMsg), alert_message = openMsg, oca_name = 'new', oca_type = strategy.oca.cancel)
         longStopPrice := math.min(close - 3, ll)
         longTargetPrice := shortPriceMin
 
     if shortSideOn and not hasShortPos and shortSignal
-        openMsg = str.format('{0}-{1}', shortMsg1, shortMsg2)
+        openMsg = str.format('{0}+{1}', shortMsg1, shortMsg2)
         strategy.order(id = 'short', qty = posSize, direction = strategy.short, comment = str.format('开仓:{0}', openMsg), alert_message = openMsg, oca_name = 'new', oca_type = strategy.oca.cancel)
         shortStopPrice := math.max(close + 3, hh)
         shortTargetPrice := longPriceMax
