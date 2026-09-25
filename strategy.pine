@@ -98,7 +98,8 @@ enableFractal = input.bool(true, title = '2m启用', group = fraGroup, inline = 
 showFractal = input.bool(false, title = '显示分型信号', group = fraGroup)
 
 pinbarGroup = 'pinbar'
-enablePinbar = input.bool(true, title = '启用', group = pinbarGroup)
+enablePinbar_5m = input.bool(true, title = '5m启用', group = pinbarGroup, inline = pinbarGroup)
+enablePinbar = input.bool(true, title = '2m启用', group = pinbarGroup, inline = pinbarGroup)
 showPinbar = input.bool(false, title = "显示pinbar信号", group = pinbarGroup)
 r1 = input.float(0.7, title = "影线最小占比", step=0.1, group = pinbarGroup)
 r2 = input.float(0.2, title = "短影线最大占比", step=0.1, group = pinbarGroup)
@@ -110,7 +111,8 @@ moreR1 = input.float(0.5, title = "影线最小占比", step=0.1, group = pinbar
 moreR2 = input.float(0.2, title = "短影线最大$", step=0.1, group = pinbarMoreGroup)
 
 insidebarGroup = 'insidebar'
-enableInsideBar = input.bool(true, title = '启用', group = insidebarGroup)
+enableInsideBar_5m = input.bool(true, title = '5m启用', group = insidebarGroup, inline = insidebarGroup)
+enableInsideBar = input.bool(true, title = '2m启用', group = insidebarGroup, inline = insidebarGroup)
 showInsidebar = input.bool(false, title = "显示insidebar信号", group = insidebarGroup)
 
 tunmoGroup = '吞没'
@@ -365,9 +367,9 @@ bearishInsideBarSignal = enableInsideBar and bearishInsideBar
 longMsg1 = '5m'
 if enableFractal_5m and fractalBottom_5m
     longMsg1 += '底分型'
-else if enablePinbar and pinbarUp_5m
+else if enablePinbar_5m and pinbarUp_5m
     longMsg1 += 'PB'
-else if enableInsideBar and bullishInsideBar_5m
+else if enableInsideBar_5m and bullishInsideBar_5m
     longMsg1 += 'IB'
 
 longMsg2 = str.tostring(timeframe.period)
@@ -381,9 +383,9 @@ else if enableInsideBar and bullishInsideBar
 shortMsg1 = '5'
 if enableFractal_5m and fractalTop_5m
     shortMsg1 += '顶分型'
-else if enablePinbar and pinbarDown_5m
+else if enablePinbar_5m and pinbarDown_5m
     shortMsg1 += 'PB'
-else if enableInsideBar and bearishInsideBar_5m
+else if enableInsideBar_5m and bearishInsideBar_5m
     shortMsg1 += 'IB'
 
 shortMsg2 = str.tostring(timeframe.period)
@@ -394,11 +396,11 @@ else if enablePinbar and pinbarDown
 else if enableInsideBar and bearishInsideBar
     shortMsg2 += 'IB'
 
-long_5m = (enableFractal_5m and fractalBottom_5m) or (enablePinbar and pinbarUp_5m) or (enableInsideBar and bullishInsideBar_5m)
+long_5m = (enableFractal_5m and fractalBottom_5m) or (enablePinbar_5m and pinbarUp_5m) or (enableInsideBar_5m and bullishInsideBar_5m)
 
 longSignal = longSideOn and isInLongPirce and long_5m and (fractalBottomSignal or pinbarUpSignal or bullishInsideBarSignal)
 
-short_5m = (enableFractal_5m and fractalTop_5m) or (enablePinbar and pinbarDown_5m) or (enableInsideBar and bearishInsideBar_5m)
+short_5m = (enableFractal_5m and fractalTop_5m) or (enablePinbar_5m and pinbarDown_5m) or (enableInsideBar_5m and bearishInsideBar_5m)
 
 shortSignal = (shortSideOn and isInShortPrice and short_5m and (fractalTopSignal or pinbarDownSignal or bearishInsideBarSignal))
 
