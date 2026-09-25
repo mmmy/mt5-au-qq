@@ -374,8 +374,9 @@ bgcolor(showTunmo and tumoShort ? color.new(color.red, 70) : na)
 isInLongPirce = not (high < longPriceMin) and not (low > longPriceMax) and longPriceIndex >= 0
 isInShortPrice = not (high < shortPriceMin) and not (low > shortPriceMax) and shortPriceIndex >= 0
 
-[fractalTop_5m, fractalBottom_5m, pinbarUp_5m, pinbarDown_5m, pinbarMore_5m, bullishInsideBar_5m, bearishInsideBar_5m, tumoLong_5m, tumoShort_5m, isInLongPirce_5m, isInShortPrice_5m, isConfrimed_5m] = request.security('', '5',
-  [fractalTop, fractalBottom, pinbarUp, pinbarDown, pinbarMore, bullishInsideBar, bearishInsideBar, tumoLong, tumoShort, isInLongPirce, isInShortPrice, barstate.isconfirmed], lookahead = barmerge.lookahead_off)
+// 只使用上一根已经收盘的5分钟K线，避免实时信号与历史回测不一致
+[fractalTop_5m, fractalBottom_5m, pinbarUp_5m, pinbarDown_5m, pinbarMore_5m, bullishInsideBar_5m, bearishInsideBar_5m, tumoLong_5m, tumoShort_5m, isInLongPirce_5m, isInShortPrice_5m] = request.security(syminfo.tickerid, '5',
+  [fractalTop[1], fractalBottom[1], pinbarUp[1], pinbarDown[1], pinbarMore[1], bullishInsideBar[1], bearishInsideBar[1], tumoLong[1], tumoShort[1], isInLongPirce[1], isInShortPrice[1]], lookahead = barmerge.lookahead_on)
 
 fractalBottomSignal = enableFractal and fractalBottom
 fractalTopSignal = enableFractal and fractalTop
@@ -439,11 +440,11 @@ else if enableInsideBar and bearishInsideBar
 else if enableTunmo and tumoShort
     shortMsg2 += '吞没'
 // 生成信号,5m与2m共振
-long_5m = isConfrimed_5m and isInLongPirce_5m and ((enableFractal_5m and fractalBottom_5m) or (enablePinbar_5m and pinbarUp_5m) or (enablePinbarMore_5m and pinbarMore_5m) or (enableInsideBar_5m and bullishInsideBar_5m) or (enableTunmo_5m and tumoLong_5m))
+long_5m = isInLongPirce_5m and ((enableFractal_5m and fractalBottom_5m) or (enablePinbar_5m and pinbarUp_5m) or (enablePinbarMore_5m and pinbarMore_5m) or (enableInsideBar_5m and bullishInsideBar_5m) or (enableTunmo_5m and tumoLong_5m))
 bsLong_5m = ta.barssince(long_5m)
 longSignal = longSideOn and long_5m and (fractalBottomSignal or pinbarUpSignal or pinbarMoreSignal or bullishInsideBarSignal or tumoLongSignal)
 
-short_5m = isConfrimed_5m and isInShortPrice_5m and ((enableFractal_5m and fractalTop_5m) or (enablePinbar_5m and pinbarDown_5m) or (enablePinbarMore_5m and pinbarMore_5m) or (enableInsideBar_5m and bearishInsideBar_5m) or (enableTunmo_5m and tumoShort_5m))
+short_5m = isInShortPrice_5m and ((enableFractal_5m and fractalTop_5m) or (enablePinbar_5m and pinbarDown_5m) or (enablePinbarMore_5m and pinbarMore_5m) or (enableInsideBar_5m and bearishInsideBar_5m) or (enableTunmo_5m and tumoShort_5m))
 bsShort_5m = ta.barssince(short_5m)
 shortSignal = shortSideOn and short_5m and (fractalTopSignal or pinbarDownSignal or pinbarMoreSignal or bearishInsideBarSignal or tumoShortSignal)
 
