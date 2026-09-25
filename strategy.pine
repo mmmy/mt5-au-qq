@@ -10,19 +10,19 @@ startTime = input.time(defval = 0, title = '开始时间', confirm = true, inlin
 posSize = input.float(1, title = '仓位大小')
 
 enablePrice1 = input.bool(true, title = '开启', inline = 'price1')
-price1 = input.price(4580, title = '价格1', inline = "price1")
+price1 = input.price(4200, title = '价格1', inline = "price1")
 p1Color = input.color(color.blue, title = '', inline = "price1")
 
 enablePrice2 = input.bool(true, title = '开启', inline = 'price2')
-price2 = input.price(4600, title = '价格2', inline = "price2")
+price2 = input.price(4230, title = '价格2', inline = "price2")
 p2Color = input.color(color.blue, title = '', inline = "price2")
 
 enablePrice3 = input.bool(true, title = '开启', inline = 'price3')
-price3 = input.price(4630, title = '价格3', inline = "price3")
+price3 = input.price(4260, title = '价格3', inline = "price3")
 p3Color = input.color(color.blue, title = '', inline = "price3")
 
 enablePrice4 = input.bool(true, title = '开启', inline = 'price4')
-price4 = input.price(4660, title = '价格4', inline = "price4")
+price4 = input.price(4300, title = '价格4', inline = "price4")
 p4Color = input.color(color.blue, title = '', inline = "price4")
 
 enablePrice5 = input.bool(true, title = '开启', inline = 'price5')
@@ -90,6 +90,7 @@ price20 = input.price(0, title = '价格20', inline = "price20")
 p20Color = input.color(color.blue, title = '', inline = "price20")
 
 priceDelta = input.float(2, title = '入场价格区间偏离', minval = 0)
+stopDelta = input.float(3.6, title = '止损价格偏离', minval = 0)
 
 fraGroup = '分型'
 enableFractal = input.bool(true, title = '启用', group = fraGroup)
@@ -98,10 +99,23 @@ showFractal = input.bool(false, title = '显示分型信号', group = fraGroup)
 pinbarGroup = 'pinbar'
 enablePinbar = input.bool(true, title = '启用', group = pinbarGroup)
 showPinbar = input.bool(false, title = "显示pinbar信号", group = pinbarGroup)
+r1 = input.float(0.7, title = "影线最小占比", step=0.1, group = pinbarGroup)
+r2 = input.float(0.2, title = "短影线最大占比", step=0.1, group = pinbarGroup)
+
+pinbarMoreGroup = 'pinbar more'
+enablePinbarMore = input.bool(true, title = '启用', group = pinbarMoreGroup)
+showPinbarMore = input.bool(false, title = "显示pinbar more信号", group = pinbarMoreGroup)
+moreR1 = input.float(0.5, title = "影线最小占比", step=0.1, group = pinbarMoreGroup)
+moreR2 = input.float(0.2, title = "短影线最大$", step=0.1, group = pinbarMoreGroup)
 
 insidebarGroup = 'insidebar'
 enableInsideBar = input.bool(true, title = '启用', group = insidebarGroup)
 showInsidebar = input.bool(false, title = "显示insidebar信号", group = insidebarGroup)
+
+tunmoGroup = '吞没'
+enableTunmo = input.bool(true, title = '启用', group = tunmoGroup)
+showTunmo = input.bool(false, title = "显示吞没信号", group = tunmoGroup)
+useTunmo3 = input.bool(true, title = "启用3k吞没", group = tunmoGroup)
 
 longSideOn = strategySide == '看多' or strategySide == '自动'
 shortSideOn = strategySide == '看空' or strategySide == '自动'
@@ -232,18 +246,19 @@ priceFilter30 = priceFilter30_1
 
 // plot(priceFilter30, color = isLongBar30 ? color.green : color.red)
 
-[isLongBar15_1, priceFilter15_1] = request.security('', '15', [isLongBar[1], priceFilter[1]], lookahead = barmerge.lookahead_on)
+// [isLongBar15_1, priceFilter15_1] = request.security('', '15', [isLongBar[1], priceFilter[1]], lookahead = barmerge.lookahead_on)
 // plot(priceFilter15_1, color = isLongBar15_1 ? color.green : color.red)
+// 定位到做多和做空的价格
 longPriceIndex = -1
 longPrice = 0.0
 shortPriceIndex = -1
 shortPrice = 0.0
 for [index, value] in prices
     if timeFilter
-        if priceFilter30_1 >= value and priceFilter15_1 >= value
+        if priceFilter30_1 >= value //and priceFilter15_1 >= value
             longPriceIndex := index
             longPrice := value
-        if shortPrice <= 0 and priceFilter30_1 <= value and priceFilter15_1 <= value
+        if shortPrice <= 0 and priceFilter30_1 <= value //and priceFilter15_1 <= value
             shortPriceIndex := index
             shortPrice := value
 
@@ -289,10 +304,12 @@ fill(sp1, sp2, color=color.new(color.red, 80))
 // shortCondition = upLV and high < price2 and price2 - high < 2
 // if (shortCondition)
 //     strategy.close("long")
+upBar = close > open
+downBar = close < open
 
 // 顶底分型
-fractalTop = high[1] > high[2] and low[1] > low[2] and high < high[1] and low < low[1] and close < open
-fractalBottom = high[1] < high[2] and low[1] < low[2] and high > high[1] and low > low[1] and close > open
+fractalTop = high[1] > high[2] and low[1] > low[2] and high < high[1] and low < low[1]  and close < open[2] and downBar and close[1] > open[2] and upBar[2] 
+fractalBottom = high[1] < high[2] and low[1] < low[2] and high > high[1] and low > low[1] and close > open[2] and upBar and close[1] < open[2] and downBar[2]
 bgcolor(showFractal and fractalTop ? color.new(color.red, 70) : na)
 bgcolor(showFractal and fractalBottom ? color.new(color.green, 70) : na)
 
@@ -305,12 +322,13 @@ lowerShadow = bodyLower - low
 upperShadowRatio = totalRange == 0 ? 0 : upperShadow / totalRange
 lowerShadowRatio = totalRange == 0 ? 0 : lowerShadow / totalRange
 //pinbar, 需要同时有上下影线
-pinbarUp = upperShadowRatio > 0 and upperShadowRatio < 0.1 and lowerShadowRatio > 0.6
-pinbarDown = lowerShadowRatio > 0 and lowerShadowRatio < 0.1 and upperShadowRatio > 0.6
+pinbarUp = upperShadowRatio > 0 and lowerShadowRatio > r1 and upperShadowRatio < r2
+pinbarDown = lowerShadowRatio > 0 and upperShadowRatio > r1 and lowerShadowRatio < r2
 bgcolor(showPinbar and pinbarUp ? color.new(color.green, 70) : na)
 bgcolor(showPinbar and pinbarDown ? color.new(color.red, 70) : na)
-
-pinbarMore = upperShadow < 0.1 and lowerShadowRatio > 0.5
+// pinbar more
+pinbarMore = upperShadow < moreR2 and lowerShadowRatio > moreR1
+bgcolor(showPinbarMore and pinbarMore ? color.new(color.blue, 70) : na)
 
 insideBar = high[1] <= high[2] and low[1] >= low[2] and bodyUpper[1] <= bodyUpper[2] and bodyLower[1] >= bodyLower[2]
 //insidebar, 内含k线然后突破
@@ -318,8 +336,18 @@ bullishInsideBar = insideBar and close > bodyUpper[2]
 bearishInsideBar = insideBar and close < bodyLower[2]
 bgcolor(showInsidebar and bullishInsideBar ? color.new(color.green, 70) : na)
 bgcolor(showInsidebar and bearishInsideBar ? color.new(color.red, 70) : na)
+// 吞没
+tumoLong = (downBar[1] and upBar and close[1] >= open and open[1] <= close) or (
+  useTunmo3 ? (downBar[2] and upBar[1] and upBar and open[1] <= close[3] and close > open[2]) : false)
+tumoShort = (upBar[1] and downBar and open >= close[1] and close < open[1]) or (
+  useTunmo3 ? (upBar[2] and downBar[1] and downBar and open[1] >= close[3] and close < open[2]) : false)
 
-[fractalTop_5m, fractalBottom_5m, pinbarUp_5m, pinbarDown_5m, bullishInsideBar_5m, bearishInsideBar_5m] = request.security('', '5', [fractalTop, fractalBottom, pinbarUp, pinbarDown, bullishInsideBar, bearishInsideBar], lookahead = barmerge.lookahead_on)
+bgcolor(showTunmo and tumoLong ? color.new(color.green, 70) : na)
+bgcolor(showTunmo and tumoShort ? color.new(color.red, 70) : na)
+
+
+[fractalTop_5m, fractalBottom_5m, pinbarUp_5m, pinbarDown_5m, bullishInsideBar_5m, bearishInsideBar_5m] = request.security('', '5', 
+  [fractalTop, fractalBottom, pinbarUp, pinbarDown, bullishInsideBar, bearishInsideBar], lookahead = barmerge.lookahead_on)
 
 isInLongPirce = low > longPriceMin and low < longPriceMax
 isInShortPrice = high < shortPriceMax and high > shortPriceMin
