@@ -76,7 +76,70 @@ Copy-Item .env.example .env
 | `SIGNAL_MAX_AGE_SECONDS` | `180` | webhook 信号最大有效秒数 |
 | `TRADING_ENABLED_AT_START` | `false` | 数据库尚无已保存开关状态时的首次默认值 |
 
-`.tv-cookie` 已加入 `.gitignore`，不能提交到版本库。如果 Cookie 曾经被提交或泄露，应立即退出 TradingView 会话并重新登录。
+### 获取 TradingView Cookie
+
+`.tv-cookie` 保存 TradingView 登录会话的 Cookie，后端通过它以当前账号的身份查询、创建和删除警报。接收 webhook 和连接 MT5 的流程本身不使用这个文件。
+
+使用 Chrome 或 Edge 获取：
+
+1. 在浏览器登录自己的 TradingView 账号，打开图表页面。
+2. 按 `F12` 打开开发者工具，切换到 **Network（网络）**。
+3. 刷新页面并打开警报列表，在网络请求中搜索 `list_alerts` 或 `pricealerts.tradingview.com`。如果没有找到，保持开发者工具打开，再次刷新页面或重新打开警报列表。
+4. 选中对应请求，在 **Headers（标头）→ Request Headers（请求标头）** 中复制 `Cookie` 的完整值。不要复制响应标头中的 `Set-Cookie`。
+5. 将复制的内容保存到项目根目录的 `.tv-cookie`，使用 UTF-8 纯文本，全部内容放在一行。确认文件名没有变成 `.tv-cookie.txt`。
+
+文件格式示例（以下为占位内容，需替换为实际复制的完整 Cookie）：
+
+```text
+sessionid=实际值; sessionid_sign=实际值; 其他字段=实际值
+```
+
+程序要求内容包含 `sessionid=`，也接受带 `Cookie:` 前缀的内容。请复制完整 Cookie，不要只保留示例中的字段，也不要保存成 JSON。
+
+保存后，在本地管理页面刷新警报列表即可验证。后端每次请求都会重新读取文件，因此更新 Cookie 后无需重启服务。如果提示 Cookie 失效，请重新登录 TradingView，按上述步骤获取并覆盖文件。
+
+Cookie 相当于登录凭证，不要发送给他人。`.tv-cookie` 已加入 `.gitignore`，不能提交到版本库。如果 Cookie 曾经被提交或泄露，应立即退出 TradingView 会话并重新登录。
+
+### 获取 TradingView 警报模板（payload.json）
+
+`payload.json` 是创建 TradingView 策略警报的完整请求模板，包含策略标识 `pine_id`、策略版本 `pine_version`、输入参数、品种、周期、警报消息和 webhook 地址等。后端创建警报时会读取模板，自动替换 20 组价格及开关、开仓方向、有效 K 线数、开始时间、周期、警报名称和 webhook 地址；策略标识、版本、品种及其他设置仍取自模板。
+
+项目已有一个模板，但其中的策略标识和版本对应具体的 TradingView 策略。使用自己的账号或更新策略后，建议重新获取：
+
+1. 在 TradingView 的 Pine 编辑器中打开本项目的 `strategy.pine`，保存并添加到图表。
+2. 选择需要的黄金品种，配置策略参数。警报消息中的 `{{ticker}}` 应与后端配置的 `MT5_SYMBOL` 对应。
+3. 按 `F12` 打开开发者工具，切换到 **Network（网络）**，搜索 `create_alert`。
+4. 在 TradingView 为该策略创建一条临时警报，选择策略订单成交触发方式。在消息栏填写本项目管理页面提供的“警报消息 JSON”；若模板缺失导致页面无法读取消息，可使用下方 JSON。填写 TradingView 可访问的 webhook 地址，本机 `127.0.0.1` 地址不能直接用于 TradingView 回调。
+5. 点击创建后，在网络面板找到发往 `https://pricealerts.tradingview.com/create_alert` 的请求。
+6. 选中请求，在 **Payload（载荷）** 中查看请求正文，点击 **View source（查看源代码）**，复制完整 JSON，以 UTF-8 编码保存到项目根目录的 `payload.json`。
+7. 保存后刷新本地管理页面，确认警报消息能够正常显示。模板每次使用时都会重新读取，更新文件后无需重启服务。抓取时创建的临时警报可以在 TradingView 中删除。
+
+可填写到 TradingView 警报消息栏的 JSON：
+
+```json
+{
+  "name": "AU-BOT",
+  "side": "{{strategy.order.action}}",
+  "exchange": "{{exchange}}",
+  "period": "{{interval}}",
+  "marketPosition": "{{strategy.market_position}}",
+  "prevMarketPosition": "{{strategy.prev_market_position}}",
+  "symbol": "{{ticker}}",
+  "price": "{{close}}",
+  "timestamp": "{{timenow}}",
+  "size": "{{strategy.order.contracts}}",
+  "positionSize": "{{strategy.position_size}}",
+  "id": "{{strategy.order.id}}",
+  "alertMessage": "{{strategy.order.alert_message}}",
+  "comment": "{{strategy.order.comment}}",
+  "qtyType": "fixed",
+  "signalToken": ""
+}
+```
+
+保存到 `payload.json` 的是整个创建请求，必须包含最外层 `payload` 对象以及 `conditions` 中的完整策略信息和输入参数。不要复制响应数据，也不要只保存上面的警报消息。请求中的 `payload.message` 是一个包含 JSON 文本的字符串，直接复制原始请求正文可以保留正确的转义格式。
+
+后端按固定的 `in_*` 字段映射策略参数。如果调整了 `strategy.pine` 中输入参数的顺序或数量，需要同步检查 `app/alert_template.py` 中的参数映射；仅重新抓取模板不能修复参数错位。
 
 ## API
 
