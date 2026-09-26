@@ -399,7 +399,7 @@ bearishInsideBarSignal = enableInsideBar and bearishInsideBar
 
 tumoLongSignal = enableTunmo and tumoLong
 tumoShortSignal = enableTunmo and tumoShort
-// -----------下面的msg的组装方式不对, 不符合预期, 后期再重做--------------------
+// 当前形态描述；多个形态同时成立时，沿用下面的优先级。
 longMsg1 = '5m'
 if enableFractal_5m and fractalBottom_5m
     longMsg1 += '底分型'
@@ -458,6 +458,18 @@ short_1m = isInShortPrice and (fractalTopSignal or pinbarDownSignal or pinbarMor
 bsShort_5m = ta.barssince(short_5m)
 shortSignal = shortSideOn and bsShort_5m <= 3 and short_1m
 
+// 与 barssince 使用同一个有效信号，保存最近一次5分钟信号的形态。
+var string lastLong5mMsg = na
+var string lastShort5mMsg = na
+if long_5m
+    lastLong5mMsg := longMsg1
+if short_5m
+    lastShort5mMsg := shortMsg1
+
+// 收盘后的历史值与 longSignal[1] / shortSignal[1] 对应。
+longSignalMsg = longSignal ? str.format('{0}+{1}', lastLong5mMsg, longMsg2) : na
+shortSignalMsg = shortSignal ? str.format('{0}+{1}', lastShort5mMsg, shortMsg2) : na
+
 bgcolor(color = (showSignal5m and longSideOn and long_5m) ? color.new(color.white, 80) : na, title = '5m long')
 bgcolor(color = (showSignal5m and shortSideOn and short_5m) ? color.new(color.orange, 80) : na, title = '5m short')
 bgcolor(color = (showSignal and longSideOn and longSignal) ? color.new(color.green, 80) : na, title = 'long signal')
@@ -483,27 +495,36 @@ bsLastEntry = barsSinceLastEntry()
 
 varip float longEntryPrice = na
 varip float shortEntryPrice = na
+// 与待开仓价格一起锁定，避免等待期间的新形态覆盖开仓依据。
+varip string longEntryMsg = na
+varip string shortEntryMsg = na
 
 if hasLongPos
     longEntryPrice := na
+    longEntryMsg := na
 else
     // 2分钟信号刚收盘
     if longSignal[1]
         if na(longEntryPrice)
             longEntryPrice := longPrice + entryDelta
+            longEntryMsg := longSignalMsg[1]
     // 支撑线发生了变化, 应该重置
     if longPriceChanged
         longEntryPrice := na
+        longEntryMsg := na
 
 if hasShortPos
     shortEntryPrice := na
+    shortEntryMsg := na
 else
     if shortSignal[1]
         if na(shortEntryPrice)
             shortEntryPrice := shortPrice - entryDelta
+            shortEntryMsg := shortSignalMsg[1]
     // 压力线发生了变化, 应该重置
     if shortPriceChanged
         shortEntryPrice := na
+        shortEntryMsg := na
 
 entryLong = false
 entryShort = false
@@ -559,13 +580,11 @@ if shortSideOn and hasShortPos
 
 
 if longSideOn and not hasLongPos and entryLong
-    openMsg = str.format('{0}+{1}', longMsg1, longMsg2)
-    strategy.order(id = 'long', qty = posSize, direction = strategy.long, comment = str.format('开仓:{0}', openMsg), alert_message = openMsg, oca_name = 'new', oca_type = strategy.oca.cancel)
+    strategy.order(id = 'long', qty = posSize, direction = strategy.long, comment = str.format('开仓:{0}', longEntryMsg), alert_message = longEntryMsg, oca_name = 'new', oca_type = strategy.oca.cancel)
     longStopPrice := close - stopDelta
     longTargetPrice := shortPriceMin
 
 if shortSideOn and not hasShortPos and entryShort
-    openMsg = str.format('{0}+{1}', shortMsg1, shortMsg2)
-    strategy.order(id = 'short', qty = posSize, direction = strategy.short, comment = str.format('开仓:{0}', openMsg), alert_message = openMsg, oca_name = 'new', oca_type = strategy.oca.cancel)
+    strategy.order(id = 'short', qty = posSize, direction = strategy.short, comment = str.format('开仓:{0}', shortEntryMsg), alert_message = shortEntryMsg, oca_name = 'new', oca_type = strategy.oca.cancel)
     shortStopPrice := close + stopDelta
     shortTargetPrice := longPriceMax
