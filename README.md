@@ -12,8 +12,8 @@
 - 使用请求 UUID 防止相同创建请求被重复执行
 - 接收 TradingView 策略 webhook，并根据仓位变化识别开多、开空、平多、平空
 - SQLite 持久化信号、执行状态和 MT5 订单
-- 单一 MT5 工作线程串行执行交易
-- 默认仅允许模拟账户，使用固定小手数和独立 magic number
+- 每个 MT5 客户端使用独立执行进程，账户内串行执行交易，支持两个客户端接收同一信号
+- 支持通过共用配置限制为模拟账户，使用固定手数和独立 magic number
 - 页面展示 MT5 状态、本机 webhook URL、交易总开关和手动测试按钮，交易开关状态会持久化
 - 显示 MT5 返回的完整账户模式（Demo、Contest/考核、Real 技术模式）及服务器和脱敏账号
 
@@ -35,7 +35,7 @@ python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 
 浏览器打开 <http://127.0.0.1:8000>。API 文档位于 <http://127.0.0.1:8000/docs>。
 
-不要使用多个 Uvicorn worker。所有 MT5 操作都在一个专用工作线程中串行执行。首次运行默认停止交易；在页面手动切换后，开关状态会保存到 SQLite 并在后续重启时恢复。
+不要使用多个 Uvicorn worker。每个 MT5 客户端的操作在独立进程中串行执行，两个客户端可以独立处理信号。首次运行默认停止交易；在页面手动切换后，开关状态会保存到 SQLite 并在后续重启时恢复。
 
 MT5 需要满足以下条件：
 
@@ -75,6 +75,36 @@ Copy-Item .env.example .env
 | `MT5_DEMO_ONLY` | `false` | 是否只允许 MT5 技术类型为 Demo 的账户；Prop Firm 模拟资金账户如被标记为 Contest/Real，设为 `true` 后也会被拒绝 |
 | `SIGNAL_MAX_AGE_SECONDS` | `180` | webhook 信号最大有效秒数 |
 | `TRADING_ENABLED_AT_START` | `false` | 数据库尚无已保存开关状态时的首次默认值 |
+
+### Windows 双 MT5 客户端配置
+
+准备两个安装在不同目录的 MT5 终端，分别登录对应账户并开启算法交易。在项目根目录 `.env` 中填写 **`terminal64.exe` 的完整路径**：
+
+```dotenv
+MT5_A_TERMINAL_PATH="C:\MT5-A\terminal64.exe"
+MT5_B_TERMINAL_PATH="C:\MT5-B\terminal64.exe"
+
+# 两个客户端共用以下交易参数。
+MT5_SYMBOL=XAUUSD
+MT5_VOLUME=0.01
+MT5_MAX_VOLUME=0.10
+MT5_MAGIC=26082301
+MT5_DEVIATION=20
+MT5_EMERGENCY_SL_DISTANCE=20
+MT5_DEMO_ONLY=false
+```
+
+示例路径需替换为实际值。账号和服务器使用各终端当前登录的账户，不需要在 `.env` 中填写账号或密码。两个终端应分别登录对应账户。
+
+两个路径均留空时继续使用原来的 `MT5_TERMINAL_PATH`（或自动检测）。仅填写 A 时使用一个明确指定的客户端；填写 B 时必须同时填写 A，且两个路径不能相同。只有程序路径按客户端区分，品种、手数、最大手数、magic、允许偏差、止损距离和模拟账户限制全部共用 `MT5_*` 配置；不读取 `MT5_A_VOLUME`、`MT5_B_SYMBOL` 等客户端专属参数。修改 `.env` 后需要重启服务。
+
+`MT5_SYMBOL` 同时用于校验 TradingView 信号品种和指定两个终端实际交易的品种，因此两个终端都需要提供相同名称的交易品种。
+
+管理页面显示两个客户端的账户、连接、报价、持仓、手数和独立交易开关。总开关和客户端开关都开启才执行交易；客户端开关默认开启，总开关首次运行默认关闭，两种开关均持久化。总开关至少需要一个已启用的客户端就绪才能开启；另一个客户端未就绪时，其任务独立记录失败。手动操作可选择单个客户端或所有已启用客户端。
+
+同一条 webhook 只保存一次原始信号，并为各客户端原子创建执行任务。重复 webhook 不会重复下单，订单记录包含 `client_id`，信号列表显示各客户端结果。A 成功、B 失败会显示“部分成功”，不会自动撤销 A 的交易，也不保证两边完全同时成交。
+
+重启时仅恢复仍在等待且未过期的客户端任务；正在执行时服务中断、进程退出或调用超时的任务不会自动重试，需要核对终端订单和持仓。旧版尚未执行且没有客户端分配的任务会被阻止，避免升级后被意外广播。数据库表会自动增加所需字段，保留已有记录。
 
 ### 获取 TradingView Cookie
 
@@ -153,6 +183,8 @@ GET    /api/tradingview/setup
 GET    /api/trading/status
 POST   /api/trading/enable
 POST   /api/trading/disable
+POST   /api/trading/clients/{client_id}/enable
+POST   /api/trading/clients/{client_id}/disable
 POST   /api/mt5/actions/open_long
 POST   /api/mt5/actions/open_short
 POST   /api/mt5/actions/close_long
@@ -181,6 +213,8 @@ TradingView webhook 根据 `prevMarketPosition` 和 `marketPosition` 判断操�
 管理页面会显示可复制的 webhook URL 和警报消息 JSON。两者也可以通过 `GET /api/tradingview/setup` 获取；消息来自 `payload.json` 的 `payload.message`，后端会校验必要的 TradingView 占位符。
 
 未配置 `TRADINGVIEW_WEBHOOK_URL` 时，程序会根据浏览器访问页面时使用的协议和 Host 自动生成 URL。例如通过 `https://trade.example.com` 打开页面时，会生成 `https://trade.example.com/api/webhooks/tradingview`。如果通过 `127.0.0.1` 打开，生成的仍会是 `127.0.0.1`。反向代理需要保留原始 `Host`，并正确传递 HTTPS 协议信息。
+
+手动操作接口 `POST /api/mt5/actions/{action}` 可附加 `?client_id=A` 或 `?client_id=B`，不指定时分发到所有已启用客户端。
 
 “清除记录”只会在页面隐藏已经结束的信号，不会删除去重数据；等待中和执行中的信号不会被清除。
 

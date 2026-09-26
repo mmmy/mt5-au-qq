@@ -95,6 +95,7 @@ class SignalItem(BaseModel):
     error: str | None = None
     received_at: str
     executed_at: str | None = None
+    executions: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class ClearSignalsResponse(BaseModel):
@@ -112,6 +113,7 @@ class OrderItem(BaseModel):
     retcode: int | None = None
     message: str | None = None
     created_at: str
+    client_id: str = "A"
 
 
 class Mt5Status(BaseModel):
@@ -133,6 +135,13 @@ class Mt5Status(BaseModel):
     error: str | None = None
 
 
+class ClientRuntimeStatus(BaseModel):
+    client_id: str
+    enabled: bool
+    volume: float
+    mt5: Mt5Status
+
+
 class TradingRuntimeStatus(BaseModel):
     enabled: bool
     webhook_url: str
@@ -141,6 +150,7 @@ class TradingRuntimeStatus(BaseModel):
     emergency_sl_distance: float
     demo_only: bool
     mt5: Mt5Status
+    clients: list[ClientRuntimeStatus] = Field(default_factory=list)
 
 
 class TradingViewSetupResponse(BaseModel):

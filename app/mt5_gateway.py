@@ -57,6 +57,8 @@ class Mt5Gateway:
         deviation: int,
         emergency_sl_distance: float,
         demo_only: bool,
+        expected_login: int | None = None,
+        expected_server: str | None = None,
     ) -> None:
         self.terminal_path = terminal_path
         self.symbol = symbol
@@ -66,6 +68,8 @@ class Mt5Gateway:
         self.deviation = deviation
         self.emergency_sl_distance = emergency_sl_distance
         self.demo_only = demo_only
+        self.expected_login = expected_login
+        self.expected_server = expected_server
         self._initialized = False
 
     def shutdown(self) -> None:
@@ -78,6 +82,7 @@ class Mt5Gateway:
             self._ensure_initialized()
             terminal = mt5.terminal_info()
             account = mt5.account_info()
+            self._validate_account(account)
             symbol_info = mt5.symbol_info(self.symbol)
             tick = mt5.symbol_info_tick(self.symbol) if symbol_info else None
             positions = self._owned_positions()
@@ -136,9 +141,9 @@ class Mt5Gateway:
             return
         self.shutdown()
         if self.terminal_path:
-            initialized = mt5.initialize(str(self.terminal_path))
+            initialized = mt5.initialize(str(self.terminal_path), timeout=5000)
         else:
-            initialized = mt5.initialize()
+            initialized = mt5.initialize(timeout=5000)
         if not initialized:
             code, message = mt5.last_error()
             raise Mt5ExecutionError(f"连接 MT5 失败：{code} {message}")
@@ -148,6 +153,7 @@ class Mt5Gateway:
         self._ensure_initialized()
         terminal = mt5.terminal_info()
         account = mt5.account_info()
+        self._validate_account(account)
         if not terminal or not terminal.connected:
             raise Mt5ExecutionError("MT5 终端未连接")
         if not terminal.trade_allowed:
@@ -163,6 +169,12 @@ class Mt5Gateway:
         info = mt5.symbol_info(self.symbol)
         if not info or info.trade_mode == mt5.SYMBOL_TRADE_MODE_DISABLED:
             raise Mt5ExecutionError(f"交易品种 {self.symbol} 当前不可交易")
+
+    def _validate_account(self, account: Any) -> None:
+        if self.expected_login is not None and (not account or account.login != self.expected_login):
+            raise Mt5ExecutionError("MT5 当前账号与配置账号不一致")
+        if self.expected_server and (not account or account.server != self.expected_server):
+            raise Mt5ExecutionError("MT5 当前服务器与配置服务器不一致")
 
     def _owned_positions(self) -> list[Any]:
         positions = mt5.positions_get(symbol=self.symbol) or ()
@@ -200,6 +212,7 @@ class Mt5Gateway:
         return results
 
     def _send_deal(self, *, order_type: int, volume: float, position_ticket: int | None, action: str) -> ExecutedOrder:
+        self._validate_account(mt5.account_info())
         info = mt5.symbol_info(self.symbol)
         tick = mt5.symbol_info_tick(self.symbol)
         if not info or not tick or tick.bid <= 0 or tick.ask <= 0:

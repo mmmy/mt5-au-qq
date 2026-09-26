@@ -27,10 +27,9 @@ from app.models import (
     TradingViewWebhook,
     WebhookResponse,
 )
-from app.mt5_gateway import Mt5Gateway
+from app.multi_trading_service import MultiTradingService
 from app.trade_repository import TradeRepository
 from app.tradingview import TradingViewClient
-from app.trading_service import TradingService
 
 
 def cache_control_for_path(path: str) -> str | None:
@@ -69,28 +68,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             webhook_url=app_settings.local_webhook_url,
             repository=repository,
         )
-        gateway = Mt5Gateway(
-            terminal_path=app_settings.mt5_terminal_path,
-            symbol=app_settings.mt5_symbol,
-            volume=app_settings.mt5_volume,
-            max_volume=app_settings.mt5_max_volume,
-            magic=app_settings.mt5_magic,
-            deviation=app_settings.mt5_deviation,
-            emergency_sl_distance=app_settings.mt5_emergency_sl_distance,
-            demo_only=app_settings.mt5_demo_only,
-        )
-        app.state.trading_service = TradingService(
-            repository,
-            gateway,
-            webhook_url=app_settings.local_webhook_url,
-            symbol=app_settings.mt5_symbol,
-            volume=app_settings.mt5_volume,
-            max_volume=app_settings.mt5_max_volume,
-            emergency_sl_distance=app_settings.mt5_emergency_sl_distance,
-            demo_only=app_settings.mt5_demo_only,
-            signal_max_age_seconds=app_settings.signal_max_age_seconds,
-            enabled_at_start=app_settings.trading_enabled_at_start,
-        )
+        app.state.trading_service = MultiTradingService(repository, app_settings)
         app.state.trading_service.start()
         try:
             yield
@@ -173,13 +151,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def disable_trading(request: Request) -> TradingToggleResponse:
         return request.app.state.trading_service.disable()
 
+    @app.post("/api/trading/clients/{client_id}/enable", response_model=TradingToggleResponse)
+    async def enable_client(client_id: str, request: Request):
+        return await request.app.state.trading_service.toggle_client(client_id, True)
+
+    @app.post("/api/trading/clients/{client_id}/disable", response_model=TradingToggleResponse)
+    async def disable_client(client_id: str, request: Request):
+        return await request.app.state.trading_service.toggle_client(client_id, False)
+
     @app.post(
         "/api/mt5/actions/{action}",
         response_model=ManualActionResponse,
         status_code=status.HTTP_202_ACCEPTED,
     )
-    async def manual_mt5_action(action: TradeAction, request: Request) -> ManualActionResponse:
-        return request.app.state.trading_service.submit_manual_action(action)
+    async def manual_mt5_action(action: TradeAction, request: Request, client_id: str | None = None) -> ManualActionResponse:
+        return request.app.state.trading_service.submit_manual_action(action, client_id=client_id)
 
     @app.get("/api/trade-signals", response_model=list[SignalItem])
     async def trade_signals(request: Request, limit: int = Query(default=100, ge=1, le=500)) -> list[SignalItem]:

@@ -694,3 +694,7 @@ td:last-child {
     width: 100%;
   }
 }
+
+.client-list { display: grid; gap: 12px; margin-top: 16px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.client-list .status-card { overflow-wrap: anywhere; }
+.client-list p { margin: 8px 0; font-size: 14px; }

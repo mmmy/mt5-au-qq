@@ -199,6 +199,7 @@ function signalStatusLabel(status) {
     queued: "等待执行",
     running: "执行中",
     success: "成功",
+    partial: "部分成功",
     failed: "失败",
     blocked: "已阻止",
     expired: "已过期",
@@ -226,10 +227,52 @@ async function loadTradingViewSetup() {
   }
 }
 
+function renderMt5Clients(clients) {
+  const container = document.getElementById("mt5Clients");
+  container.replaceChildren();
+  const select = document.getElementById("manualClient");
+  const selected = select.value;
+  select.replaceChildren(new Option("所有已启用客户端", ""));
+  for (const client of clients) {
+    select.add(new Option(`客户端 ${client.client_id}`, client.client_id));
+    const card = document.createElement("div");
+    card.className = "status-card";
+    const heading = document.createElement("strong");
+    heading.textContent = `客户端 ${client.client_id} · ${client.mt5.connected ? "已连接" : "未连接"}`;
+    const details = document.createElement("p");
+    const mt5 = client.mt5;
+    details.textContent = `${accountTradeModeLabel(mt5.account_trade_mode)} · ${mt5.server || "未知服务器"} · ${mt5.login_masked || "未知账号"} · ${mt5.symbol} · 手数 ${client.volume} · 多 ${mt5.owned_long_positions} / 空 ${mt5.owned_short_positions} · 算法交易${mt5.terminal_trade_allowed ? "已开启" : "未开启"} · 报价 ${mt5.bid ?? "—"} / ${mt5.ask ?? "—"}`;
+    const error = document.createElement("p");
+    error.className = "bad";
+    error.textContent = mt5.error || "";
+    const label = document.createElement("label");
+    const toggle = document.createElement("input");
+    toggle.type = "checkbox";
+    toggle.checked = client.enabled;
+    toggle.setAttribute("aria-label", `客户端 ${client.client_id} 交易开关`);
+    toggle.addEventListener("change", async () => {
+      toggle.disabled = true;
+      try {
+        const operation = toggle.checked ? "enable" : "disable";
+        const result = await apiRequest(`/api/trading/clients/${client.client_id}/${operation}`, { method: "POST" });
+        showNotice(result.message);
+      } catch (error) {
+        showNotice(error.message, "error");
+      }
+      await loadTradingStatus();
+    });
+    label.append(toggle, " 该客户端交易开关（同时受总开关控制）");
+    card.append(heading, details, error, label);
+    container.append(card);
+  }
+  if (clients.some((client) => client.client_id === selected)) select.value = selected;
+}
+
 async function loadTradingStatus() {
   try {
     const data = await apiRequest("/api/trading/status");
     const mt5 = data.mt5;
+    renderMt5Clients(data.clients || []);
     const accountTradeMode = mt5.account_trade_mode || (mt5.demo_account ? "demo" : "unknown");
     setStatus(elements.tradingEnabledStatus, data.enabled ? "已启用" : "已停止", data.enabled);
     setStatus(elements.mt5ConnectionStatus, mt5.connected ? "已连接" : "未连接", mt5.connected);
@@ -250,6 +293,17 @@ async function loadTradingStatus() {
     elements.tradingHelp.textContent = mt5.error
       ? mt5.error
       : `固定手数 ${data.volume}，灾难保护止损距离 ${data.emergency_sl_distance}。账户模式由 MT5 服务器返回；Prop Firm 模拟资金账户可能显示为 Contest 或 Real 技术模式。`;
+    if (data.clients?.length > 1) {
+      const clients = data.clients;
+      setStatus(elements.mt5ConnectionStatus, `已连接 ${clients.filter((c) => c.mt5.connected).length} / ${clients.length}`, clients.every((c) => c.mt5.connected));
+      setStatus(elements.algoTradingStatus, `已开启 ${clients.filter((c) => c.mt5.terminal_trade_allowed).length} / ${clients.length}`, clients.every((c) => c.mt5.terminal_trade_allowed));
+      elements.accountStatus.textContent = clients.map((c) => `${c.client_id}: ${c.mt5.server || "未知服务器"} · ${c.mt5.login_masked || "未知账号"}`).join("；");
+      elements.accountStatus.className = "";
+      elements.accountModeCurrent.textContent = clients.map((c) => `${c.client_id}: ${accountTradeModeLabel(c.mt5.account_trade_mode)}`).join("；");
+      elements.quoteStatus.textContent = clients.map((c) => `${c.client_id} (${c.mt5.symbol}): ${c.mt5.bid ?? "—"} / ${c.mt5.ask ?? "—"}`).join("；");
+      elements.positionStatus.textContent = clients.map((c) => `${c.client_id}: 多 ${c.mt5.owned_long_positions} / 空 ${c.mt5.owned_short_positions}`).join("；");
+      elements.tradingHelp.textContent = "总开关与客户端开关同时开启才执行。各客户端独立下单并记录结果；停止交易不会自动平仓。";
+    }
   } catch (error) {
     elements.tradingToggle.disabled = false;
     setStatus(elements.mt5ConnectionStatus, "读取失败", false);
@@ -264,7 +318,7 @@ async function loadSignals() {
     elements.signalEmptyState.hidden = signals.length !== 0;
     elements.signalSummary.textContent = `最近 ${signals.length} 条记录`;
     elements.clearSignalsButton.disabled = !signals.some((signal) =>
-      ["success", "failed", "blocked", "expired", "ignored"].includes(signal.status),
+      ["success", "partial", "failed", "blocked", "expired", "ignored"].includes(signal.status),
     );
     for (const signal of signals) {
       const row = document.createElement("tr");
@@ -273,8 +327,11 @@ async function loadSignals() {
       appendCell(row, actionLabel(signal.action));
       appendCell(row, signalStatusLabel(signal.status));
       appendCell(row, signal.symbol);
-      const resultCell = appendCell(row, signal.error || "—", "name-cell");
-      resultCell.title = signal.error || "";
+      const result = signal.executions?.length
+        ? signal.executions.map((item) => `${item.client_id} (${item.symbol}): ${signalStatusLabel(item.status)}${item.error ? ` · ${item.error}` : ""}`).join("；")
+        : signal.error || "—";
+      const resultCell = appendCell(row, result, "name-cell");
+      resultCell.title = result;
       elements.signalTableBody.append(row);
     }
   } catch (error) {
@@ -457,7 +514,9 @@ async function submitManualAction(button) {
   }
   button.disabled = true;
   try {
-    const result = await apiRequest(`/api/mt5/actions/${action}`, { method: "POST" });
+    const client = document.getElementById("manualClient").value;
+    const suffix = client ? `?client_id=${encodeURIComponent(client)}` : "";
+    const result = await apiRequest(`/api/mt5/actions/${action}${suffix}`, { method: "POST" });
     showNotice(`交易任务已提交：${result.signal_id}`);
     await loadSignals();
     setTimeout(() => Promise.all([loadTradingStatus(), loadSignals()]), 1200);

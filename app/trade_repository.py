@@ -79,6 +79,54 @@ class TradeRepository:
             }
             if "hidden_at" not in columns:
                 connection.execute("ALTER TABLE trade_signals ADD COLUMN hidden_at TEXT")
+            if "client_id" not in columns:
+                connection.execute("ALTER TABLE trade_signals ADD COLUMN client_id TEXT")
+            if "parent_signal_id" not in columns:
+                connection.execute("ALTER TABLE trade_signals ADD COLUMN parent_signal_id TEXT")
+            order_columns = {row["name"] for row in connection.execute("PRAGMA table_info(trade_orders)")}
+            if "client_id" not in order_columns:
+                connection.execute("ALTER TABLE trade_orders ADD COLUMN client_id TEXT NOT NULL DEFAULT 'A'")
+
+    def insert_fanout(self, *, signal_id: str, source: str, action: str, symbol: str,
+                      payload: dict[str, Any], clients: list[tuple[str, str, bool]]) -> bool:
+        """Persist the original signal and all client tasks in one transaction."""
+        try:
+            with self._connect() as connection:
+                enabled = any(item[2] for item in clients)
+                now = utc_now()
+                connection.execute("""INSERT INTO trade_signals
+                    (signal_id, source, action, status, symbol, payload_json, received_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                    (signal_id, source, action, "queued" if enabled else "blocked", symbol,
+                     json.dumps(payload, ensure_ascii=False), now))
+                for client_id, target_symbol, active in clients:
+                    connection.execute("""INSERT INTO trade_signals
+                        (signal_id, source, action, status, symbol, payload_json, received_at,
+                         client_id, parent_signal_id, error)
+                        VALUES (?, ?, ?, ?, ?, '{}', ?, ?, ?, ?)""",
+                        (f"{signal_id}:{client_id}", source, action, "queued" if active else "blocked",
+                         target_symbol, now, client_id, signal_id, None if active else "交易执行未启用"))
+            return True
+        except sqlite3.IntegrityError:
+            return False
+
+    def claim_signal(self, signal_id: str) -> bool:
+        with self._connect() as connection:
+            return connection.execute("UPDATE trade_signals SET status='running' WHERE signal_id=? AND status='queued'",
+                                      (signal_id,)).rowcount == 1
+
+    def recover_client_tasks(self, client_ids: list[str]) -> list[str]:
+        with self._connect() as connection:
+            rows = connection.execute("SELECT signal_id, status, client_id FROM trade_signals WHERE parent_signal_id IS NOT NULL AND status IN ('queued','running')").fetchall()
+        queued = []
+        for row in rows:
+            if row["status"] == "running":
+                self.update_signal_status(row["signal_id"], "failed", error="服务中断，交易结果不明确；需核对终端，不会自动重试")
+            elif row["client_id"] not in client_ids:
+                self.update_signal_status(row["signal_id"], "blocked", error="客户端配置已移除")
+            else:
+                queued.append(row["signal_id"])
+        return queued
 
     def insert_signal(
         self,
@@ -123,6 +171,17 @@ class TradeRepository:
                 """,
                 (status, error, executed_at, signal_id),
             )
+            row = connection.execute("SELECT parent_signal_id FROM trade_signals WHERE signal_id=?", (signal_id,)).fetchone()
+            if row and row["parent_signal_id"]:
+                parent = row["parent_signal_id"]
+                children = connection.execute("SELECT client_id, status, error FROM trade_signals WHERE parent_signal_id=?", (parent,)).fetchall()
+                statuses = {child["status"] for child in children}
+                aggregate = ("running" if "running" in statuses else "queued" if "queued" in statuses
+                             else "success" if statuses == {"success"} else "partial" if "success" in statuses
+                             else "failed" if "failed" in statuses else "expired" if "expired" in statuses else "blocked")
+                errors = "; ".join(f"{child['client_id']}: {child['error']}" for child in children if child["error"])
+                connection.execute("UPDATE trade_signals SET status=?, error=?, executed_at=? WHERE signal_id=?",
+                    (aggregate, errors or None, None if aggregate in {"running", "queued"} else utc_now(), parent))
 
     def list_signals(self, limit: int = 100) -> list[SignalItem]:
         safe_limit = min(max(limit, 1), 500)
@@ -131,16 +190,22 @@ class TradeRepository:
                 """
                 SELECT signal_id, source, action, status, symbol, error, received_at, executed_at
                 FROM trade_signals
-                WHERE hidden_at IS NULL
+                WHERE hidden_at IS NULL AND parent_signal_id IS NULL
                 ORDER BY received_at DESC
                 LIMIT ?
                 """,
                 (safe_limit,),
             ).fetchall()
-        return [SignalItem(**self._row_to_dict(row)) for row in rows]
+            items = []
+            for row in rows:
+                item = self._row_to_dict(row)
+                children = connection.execute("SELECT client_id, status, symbol, error FROM trade_signals WHERE parent_signal_id=? ORDER BY client_id", (item["signal_id"],)).fetchall()
+                item["executions"] = [self._row_to_dict(child) for child in children]
+                items.append(SignalItem(**item))
+        return items
 
     def clear_completed_signals(self) -> int:
-        terminal_statuses = ("success", "failed", "blocked", "expired", "ignored")
+        terminal_statuses = ("success", "partial", "failed", "blocked", "expired", "ignored")
         placeholders = ", ".join("?" for _ in terminal_statuses)
         with self._connect() as connection:
             cursor = connection.execute(
@@ -148,6 +213,7 @@ class TradeRepository:
                 UPDATE trade_signals
                 SET hidden_at = ?
                 WHERE hidden_at IS NULL
+                  AND parent_signal_id IS NULL
                   AND status IN ({placeholders})
                 """,
                 (utc_now(), *terminal_statuses),
@@ -193,15 +259,16 @@ class TradeRepository:
         price: float | None,
         retcode: int | None,
         message: str | None,
+        client_id: str = "A",
     ) -> None:
         with self._connect() as connection:
             connection.execute(
                 """
                 INSERT INTO trade_orders
-                    (signal_id, action, ticket, symbol, volume, price, retcode, message, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    (signal_id, action, ticket, symbol, volume, price, retcode, message, created_at, client_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (signal_id, action, ticket, symbol, volume, price, retcode, message, utc_now()),
+                (signal_id, action, ticket, symbol, volume, price, retcode, message, utc_now(), client_id),
             )
 
     def list_orders(self, limit: int = 100) -> list[OrderItem]:

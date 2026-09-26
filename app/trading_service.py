@@ -80,10 +80,14 @@ class Mt5Worker:
         repository: TradeRepository,
         gateway: Mt5Gateway,
         is_trading_enabled: Callable[[], bool],
+        client_id: str = "A",
+        signal_max_age_seconds: int = 180,
     ) -> None:
         self.repository = repository
         self.gateway = gateway
         self.is_trading_enabled = is_trading_enabled
+        self.client_id = client_id
+        self.signal_max_age_seconds = signal_max_age_seconds
         self._queue: queue.Queue[WorkItem] = queue.Queue()
         self._thread: threading.Thread | None = None
         self._stopping = threading.Event()
@@ -119,7 +123,10 @@ class Mt5Worker:
                 if item.kind == "stop":
                     break
                 if item.kind == "status" and item.future:
-                    item.future.set_result(self.gateway.status())
+                    try:
+                        item.future.set_result(self.gateway.status())
+                    except Exception as exc:
+                        item.future.set_exception(exc)
                     continue
                 if item.kind == "signal" and item.signal_id:
                     self._execute_signal(item.signal_id)
@@ -130,10 +137,26 @@ class Mt5Worker:
         signal = self.repository.get_signal(signal_id)
         if not signal or signal["status"] != "queued":
             return
+        if signal.get("client_id") and signal["client_id"] != self.client_id:
+            return
+        received = datetime.fromisoformat(signal["received_at"]).timestamp()
+        if time.time() - received > self.signal_max_age_seconds:
+            self.repository.update_signal_status(signal_id, "expired", error="排队信号已经过期")
+            return
+        if signal["source"] == "tradingview":
+            original = self.repository.get_signal(signal["parent_signal_id"]) if signal.get("parent_signal_id") else signal
+            try:
+                body = json.loads(original["payload_json"])
+                validate_signal_age(body["timestamp"], self.signal_max_age_seconds)
+            except (ValidationError, KeyError, TypeError, ValueError) as exc:
+                self.repository.update_signal_status(signal_id, "expired", error=str(exc)[:500])
+                return
         if not self.is_trading_enabled():
             self.repository.update_signal_status(signal_id, "blocked", error="交易执行未启用")
             return
 
+        if not self.repository.claim_signal(signal_id):
+            return
         self.repository.update_signal_status(signal_id, "running")
         try:
             action = TradeAction(signal["action"])
@@ -148,6 +171,7 @@ class Mt5Worker:
                     price=order.price,
                     retcode=order.retcode,
                     message=order.message,
+                    client_id=self.client_id,
                 )
             self.repository.update_signal_status(signal_id, "success")
         except Exception as exc:
@@ -311,31 +335,35 @@ class TradingService:
         return ManualActionResponse(accepted=True, signal_id=signal_id, action=action, status="queued")
 
     def _validate_signal_age(self, raw_timestamp: str) -> None:
+        validate_signal_age(raw_timestamp, self.signal_max_age_seconds)
+
+
+def validate_signal_age(raw_timestamp: str, signal_max_age_seconds: int) -> None:
+    try:
+        numeric = float(raw_timestamp)
+    except (TypeError, ValueError):
         try:
-            numeric = float(raw_timestamp)
-        except (TypeError, ValueError):
-            try:
-                normalized = raw_timestamp.strip()
-                if normalized.endswith(("Z", "z")):
-                    normalized = normalized[:-1] + "+00:00"
-                parsed = datetime.fromisoformat(normalized)
-                if parsed.tzinfo is None:
-                    raise ValueError("timestamp timezone is missing")
-                timestamp_seconds = parsed.timestamp()
-            except (AttributeError, OSError, OverflowError, ValueError) as exc:
-                raise ValidationError(
-                    "TradingView timestamp 格式不正确",
-                    code="INVALID_SIGNAL_TIMESTAMP",
-                ) from exc
-        else:
-            if not math.isfinite(numeric):
-                raise ValidationError(
-                    "TradingView timestamp 格式不正确",
-                    code="INVALID_SIGNAL_TIMESTAMP",
-                )
-            timestamp_seconds = numeric / 1000 if numeric > 10_000_000_000 else numeric
-        age = time.time() - timestamp_seconds
-        if age > self.signal_max_age_seconds:
-            raise ValidationError("TradingView 信号已经过期", code="EXPIRED_SIGNAL")
-        if age < -60:
-            raise ValidationError("TradingView 信号时间来自未来", code="INVALID_SIGNAL_TIMESTAMP")
+            normalized = raw_timestamp.strip()
+            if normalized.endswith(("Z", "z")):
+                normalized = normalized[:-1] + "+00:00"
+            parsed = datetime.fromisoformat(normalized)
+            if parsed.tzinfo is None:
+                raise ValueError("timestamp timezone is missing")
+            timestamp_seconds = parsed.timestamp()
+        except (AttributeError, OSError, OverflowError, ValueError) as exc:
+            raise ValidationError(
+                "TradingView timestamp 格式不正确",
+                code="INVALID_SIGNAL_TIMESTAMP",
+            ) from exc
+    else:
+        if not math.isfinite(numeric):
+            raise ValidationError(
+                "TradingView timestamp 格式不正确",
+                code="INVALID_SIGNAL_TIMESTAMP",
+            )
+        timestamp_seconds = numeric / 1000 if numeric > 10_000_000_000 else numeric
+    age = time.time() - timestamp_seconds
+    if age > signal_max_age_seconds:
+        raise ValidationError("TradingView 信号已经过期", code="EXPIRED_SIGNAL")
+    if age < -60:
+        raise ValidationError("TradingView 信号时间来自未来", code="INVALID_SIGNAL_TIMESTAMP")

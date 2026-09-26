@@ -65,7 +65,7 @@
             </div>
           </div>
           <div class="status-card">
-            <span>XAUUSD 报价</span>
+            <span>交易品种报价</span>
             <strong id="quoteStatus">读取中</strong>
           </div>
           <div class="status-card">
@@ -73,6 +73,8 @@
             <strong id="positionStatus">读取中</strong>
           </div>
         </div>
+
+        <div id="mt5Clients" class="client-list" aria-label="MT5 客户端状态"></div>
 
         <div class="webhook-box">
           <div>
@@ -91,6 +93,8 @@
         </div>
 
         <div class="manual-actions" aria-label="MT5 手动平仓操作">
+          <label for="manualClient">执行客户端</label>
+          <select id="manualClient"><option value="">所有已启用客户端</option></select>
           <button class="button action-button" type="button" data-trade-action="close_long">平多</button>
           <button class="button action-button" type="button" data-trade-action="close_short">平空</button>
         </div>

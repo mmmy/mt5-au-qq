@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -16,6 +16,21 @@ def _env_bool(name: str, default: bool) -> bool:
     if raw is None:
         return default
     return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+@dataclass(frozen=True, slots=True)
+class Mt5ClientConfig:
+    client_id: str
+    terminal_path: Path | None
+    symbol: str
+    volume: float
+    max_volume: float
+    magic: int
+    deviation: int
+    emergency_sl_distance: float
+    demo_only: bool
+    expected_login: int | None = None
+    expected_server: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,6 +53,14 @@ class Settings:
     mt5_demo_only: bool
     signal_max_age_seconds: int
     trading_enabled_at_start: bool
+    mt5_clients: tuple[Mt5ClientConfig, ...] = ()
+
+    def clients(self) -> tuple[Mt5ClientConfig, ...]:
+        if self.mt5_clients:
+            return self.mt5_clients
+        return (Mt5ClientConfig("A", self.mt5_terminal_path, self.mt5_symbol,
+            self.mt5_volume, self.mt5_max_volume, self.mt5_magic, self.mt5_deviation,
+            self.mt5_emergency_sl_distance, self.mt5_demo_only),)
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -50,7 +73,7 @@ class Settings:
             terminal_path = DEFAULT_MT5_TERMINAL
         else:
             terminal_path = None
-        return cls(
+        settings = cls(
             cookie_file=Path(os.getenv("TV_COOKIE_FILE", PROJECT_ROOT / ".tv-cookie")),
             payload_file=Path(os.getenv("TV_PAYLOAD_FILE", PROJECT_ROOT / "payload.json")),
             static_dir=Path(os.getenv("STATIC_DIR", PROJECT_ROOT / "app" / "static")),
@@ -70,3 +93,23 @@ class Settings:
             signal_max_age_seconds=int(os.getenv("SIGNAL_MAX_AGE_SECONDS", "180")),
             trading_enabled_at_start=_env_bool("TRADING_ENABLED_AT_START", False),
         )
+        clients = []
+        for client_id in ("A", "B"):
+            path = os.getenv(f"MT5_{client_id}_TERMINAL_PATH", "").strip()
+            if path:
+                clients.append(Mt5ClientConfig(
+                    client_id=client_id,
+                    terminal_path=Path(path),
+                    symbol=settings.mt5_symbol,
+                    volume=settings.mt5_volume,
+                    max_volume=settings.mt5_max_volume,
+                    magic=settings.mt5_magic,
+                    deviation=settings.mt5_deviation,
+                    emergency_sl_distance=settings.mt5_emergency_sl_distance,
+                    demo_only=settings.mt5_demo_only,
+                ))
+        if clients and clients[0].client_id != "A":
+            raise ValueError("配置客户端 B 时必须同时配置 MT5_A_TERMINAL_PATH")
+        if len(clients) == 2 and clients[0].terminal_path.resolve() == clients[1].terminal_path.resolve():
+            raise ValueError("两个 MT5 客户端必须使用不同的终端路径")
+        return replace(settings, mt5_clients=tuple(clients))
