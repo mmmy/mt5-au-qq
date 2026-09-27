@@ -29,7 +29,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -119,139 +120,69 @@ h2 {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+  align-items: center;
 }
 
-.status-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-  padding: 0 24px 20px;
+.trading-master-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
 }
 
-.status-card {
-  min-width: 0;
-  padding: 14px 16px;
+.good { color: var(--success); }
+.bad { color: var(--danger); }
+
+.client-table-wrap {
+  margin: 0 24px 18px;
+  overflow-x: auto;
   border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--bg);
+  border-radius: 8px;
 }
 
-.status-card span,
+.client-table {
+  background: var(--bg);
+  font-size: 13px;
+}
+
+.client-table th,
+.client-table td {
+  padding: 10px 12px;
+}
+
+.client-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.client-table td:last-child,
+.client-table th:last-child {
+  text-align: center;
+}
+
+.client-name { font-weight: 700; }
+
+.client-account {
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.client-error {
+  display: inline-block;
+  max-width: 130px;
+  margin-left: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
 .webhook-box span {
   display: block;
   margin-bottom: 6px;
   color: var(--muted);
   font-size: 12px;
-}
-
-.status-card strong {
-  display: block;
-  overflow: hidden;
-  color: var(--text);
-  font-size: 14px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.status-card strong.good {
-  color: var(--success);
-}
-
-.status-card strong.bad {
-  color: var(--danger);
-}
-
-.account-status-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.account-status-row > strong {
-  min-width: 0;
-}
-
-.account-mode-help {
-  position: relative;
-  z-index: 5;
-  flex: 0 0 auto;
-  margin-left: auto;
-}
-
-.account-mode-help summary {
-  display: grid;
-  width: 20px;
-  height: 20px;
-  border: 1px solid var(--border);
-  border-radius: 50%;
-  background: var(--panel-soft);
-  color: var(--muted);
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 800;
-  list-style: none;
-  place-items: center;
-}
-
-.account-mode-help summary::-webkit-details-marker {
-  display: none;
-}
-
-.account-mode-help summary:hover,
-.account-mode-help summary:focus-visible,
-.account-mode-help[open] summary {
-  border-color: var(--accent);
-  color: var(--accent-hover);
-  outline: none;
-}
-
-.account-mode-popover {
-  position: absolute;
-  top: 28px;
-  right: 0;
-  width: min(390px, calc(100vw - 48px));
-  padding: 14px 16px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--panel);
-  box-shadow: 0 16px 36px rgb(0 0 0 / 38%);
-  color: var(--text);
-  font-size: 12px;
-  line-height: 1.55;
-}
-
-.account-mode-popover p {
-  margin: 0;
-}
-
-.account-mode-popover .account-mode-title {
-  font-size: 13px;
-  font-weight: 800;
-}
-
-.account-mode-popover .account-mode-current {
-  margin-top: 3px;
-  color: var(--accent-hover);
-}
-
-.account-mode-popover ul {
-  margin: 10px 0;
-  padding-left: 18px;
-}
-
-.account-mode-popover li + li {
-  margin-top: 6px;
-}
-
-.account-mode-popover .account-mode-note {
-  color: var(--muted);
-}
-
-.program-trading-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
 }
 
 .switch {
@@ -676,10 +607,6 @@ td:last-child {
     width: 100%;
   }
 
-  .status-grid {
-    grid-template-columns: 1fr;
-  }
-
   .alert-config-grid {
     grid-template-columns: 1fr;
   }
@@ -695,6 +622,12 @@ td:last-child {
   }
 }
 
-.client-list { display: grid; gap: 12px; margin-top: 16px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
-.client-list .status-card { overflow-wrap: anywhere; }
-.client-list p { margin: 8px 0; font-size: 14px; }
+
+.manual-actions select {
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+}

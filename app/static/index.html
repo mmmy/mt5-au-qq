@@ -23,58 +23,34 @@
             <h2 id="tradingTitle">MT5 交易控制</h2>
             <p>仅管理 magic number 属于本程序的 XAUUSD 仓位。</p>
           </div>
-        </div>
-
-        <div class="status-grid">
-          <div class="status-card program-trading-card">
-            <div>
-              <span>程序交易</span>
-              <strong id="tradingEnabledStatus">读取中</strong>
-            </div>
-            <label class="switch" title="启用或停止程序交易">
-              <input id="tradingToggle" type="checkbox" role="switch" aria-label="程序交易" disabled>
+          <div class="trading-master-control">
+            <span>交易总开关</span>
+            <strong id="tradingEnabledStatus">读取中</strong>
+            <label class="switch" title="启用或停止所有客户端的程序交易">
+              <input id="tradingToggle" type="checkbox" role="switch" aria-label="交易总开关" disabled>
               <span class="switch-slider" aria-hidden="true"></span>
             </label>
           </div>
-          <div class="status-card">
-            <span>MT5 连接</span>
-            <strong id="mt5ConnectionStatus">读取中</strong>
-          </div>
-          <div class="status-card">
-            <span>算法交易</span>
-            <strong id="algoTradingStatus">读取中</strong>
-          </div>
-          <div class="status-card">
-            <span>账户</span>
-            <div class="account-status-row">
-              <strong id="accountStatus">读取中</strong>
-              <details id="accountModeHelp" class="account-mode-help">
-                <summary aria-label="查看 MT5 账户类型说明" title="账户类型说明">?</summary>
-                <div class="account-mode-popover" role="note">
-                  <p class="account-mode-title">MT5 账户技术类型</p>
-                  <p id="accountModeCurrent" class="account-mode-current">当前：读取中</p>
-                  <ul>
-                    <li><b>Demo</b>：MT5 标准模拟账户，通常使用虚拟资金。</li>
-                    <li><b>Contest</b>：竞赛或考核账户，常见于挑战和评估环境。</li>
-                    <li><b>Real</b>：MT5 技术上标记为真实模式；Prop Firm 仍可能使用模拟资金。</li>
-                    <li><b>Unknown</b>：未连接账户，或 MT5 返回了无法识别的类型。</li>
-                  </ul>
-                  <p class="account-mode-note">资金是否为真实资金，应以账户服务商的说明为准。</p>
-                </div>
-              </details>
-            </div>
-          </div>
-          <div class="status-card">
-            <span>交易品种报价</span>
-            <strong id="quoteStatus">读取中</strong>
-          </div>
-          <div class="status-card">
-            <span>程序持仓</span>
-            <strong id="positionStatus">读取中</strong>
-          </div>
         </div>
 
-        <div id="mt5Clients" class="client-list" aria-label="MT5 客户端状态"></div>
+        <div class="client-table-wrap">
+          <table class="client-table" aria-label="MT5 客户端配置和状态">
+            <thead>
+              <tr>
+                <th>客户端</th>
+                <th>连接</th>
+                <th>账户</th>
+                <th>品种</th>
+                <th>手数</th>
+                <th>报价（买 / 卖）</th>
+                <th>持仓</th>
+                <th>算法交易</th>
+                <th>交易开关</th>
+              </tr>
+            </thead>
+            <tbody id="mt5Clients"><tr><td colspan="9">正在读取客户端……</td></tr></tbody>
+          </table>
+        </div>
 
         <div class="webhook-box">
           <div>

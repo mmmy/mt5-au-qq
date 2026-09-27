@@ -17,13 +17,6 @@ const elements = {
   notice: document.querySelector("#notice"),
   tradingToggle: document.querySelector("#tradingToggle"),
   tradingEnabledStatus: document.querySelector("#tradingEnabledStatus"),
-  mt5ConnectionStatus: document.querySelector("#mt5ConnectionStatus"),
-  algoTradingStatus: document.querySelector("#algoTradingStatus"),
-  accountStatus: document.querySelector("#accountStatus"),
-  accountModeHelp: document.querySelector("#accountModeHelp"),
-  accountModeCurrent: document.querySelector("#accountModeCurrent"),
-  quoteStatus: document.querySelector("#quoteStatus"),
-  positionStatus: document.querySelector("#positionStatus"),
   webhookUrl: document.querySelector("#webhookUrl"),
   copyWebhookButton: document.querySelector("#copyWebhookButton"),
   openWebhookMessageButton: document.querySelector("#openWebhookMessageButton"),
@@ -235,35 +228,53 @@ function renderMt5Clients(clients) {
   select.replaceChildren(new Option("所有已启用客户端", ""));
   for (const client of clients) {
     select.add(new Option(`客户端 ${client.client_id}`, client.client_id));
-    const card = document.createElement("div");
-    card.className = "status-card";
-    const heading = document.createElement("strong");
-    heading.textContent = `客户端 ${client.client_id} · ${client.mt5.connected ? "已连接" : "未连接"}`;
-    const details = document.createElement("p");
+    const row = document.createElement("tr");
     const mt5 = client.mt5;
-    details.textContent = `${accountTradeModeLabel(mt5.account_trade_mode)} · ${mt5.server || "未知服务器"} · ${mt5.login_masked || "未知账号"} · ${mt5.symbol} · 手数 ${client.volume} · 多 ${mt5.owned_long_positions} / 空 ${mt5.owned_short_positions} · 算法交易${mt5.terminal_trade_allowed ? "已开启" : "未开启"} · 报价 ${mt5.bid ?? "—"} / ${mt5.ask ?? "—"}`;
-    const error = document.createElement("p");
-    error.className = "bad";
-    error.textContent = mt5.error || "";
+    appendCell(row, `客户端 ${client.client_id}`, "client-name");
+    const connection = appendCell(row, mt5.connected ? "已连接" : "未连接", mt5.connected ? "good" : "bad");
+    connection.title = mt5.error || (mt5.connected ? "MT5 已连接" : "MT5 未连接");
+    if (mt5.error) {
+      const error = document.createElement("span");
+      error.className = "client-error";
+      error.textContent = mt5.error;
+      connection.append(error);
+    }
+    const mode = accountTradeModeLabel(mt5.account_trade_mode);
+    const account = `${mode} · ${mt5.server || "未知服务器"} · ${mt5.login_masked || "未知账号"}`;
+    const accountCell = appendCell(row, account, "client-account");
+    accountCell.title = `${account}。账户模式由 MT5 返回，资金性质以服务商说明为准。`;
+    appendCell(row, mt5.symbol);
+    appendCell(row, client.volume);
+    appendCell(row, `${mt5.bid ?? "—"} / ${mt5.ask ?? "—"}`);
+    appendCell(row, `多 ${mt5.owned_long_positions} / 空 ${mt5.owned_short_positions}`);
+    appendCell(row, mt5.terminal_trade_allowed ? "已开启" : "未开启", mt5.terminal_trade_allowed ? "good" : "bad");
+    const control = document.createElement("td");
     const label = document.createElement("label");
+    label.className = "switch";
+    label.title = "客户端开关（同时受交易总开关控制）";
     const toggle = document.createElement("input");
     toggle.type = "checkbox";
+    toggle.setAttribute("role", "switch");
     toggle.checked = client.enabled;
     toggle.setAttribute("aria-label", `客户端 ${client.client_id} 交易开关`);
     toggle.addEventListener("change", async () => {
       toggle.disabled = true;
       try {
         const operation = toggle.checked ? "enable" : "disable";
-        const result = await apiRequest(`/api/trading/clients/${client.client_id}/${operation}`, { method: "POST" });
+        const result = await apiRequest(`/api/trading/clients/${encodeURIComponent(client.client_id)}/${operation}`, { method: "POST" });
         showNotice(result.message);
       } catch (error) {
         showNotice(error.message, "error");
       }
       await loadTradingStatus();
     });
-    label.append(toggle, " 该客户端交易开关（同时受总开关控制）");
-    card.append(heading, details, error, label);
-    container.append(card);
+    const slider = document.createElement("span");
+    slider.className = "switch-slider";
+    slider.setAttribute("aria-hidden", "true");
+    label.append(toggle, slider);
+    control.append(label);
+    row.append(control);
+    container.append(row);
   }
   if (clients.some((client) => client.client_id === selected)) select.value = selected;
 }
@@ -271,42 +282,22 @@ function renderMt5Clients(clients) {
 async function loadTradingStatus() {
   try {
     const data = await apiRequest("/api/trading/status");
-    const mt5 = data.mt5;
-    renderMt5Clients(data.clients || []);
-    const accountTradeMode = mt5.account_trade_mode || (mt5.demo_account ? "demo" : "unknown");
+    // Older single-client responses still use the same compact row.
+    const clients = data.clients?.length ? data.clients : [
+      { client_id: "A", enabled: data.enabled, volume: data.volume, mt5: data.mt5 },
+    ];
+    renderMt5Clients(clients);
     setStatus(elements.tradingEnabledStatus, data.enabled ? "已启用" : "已停止", data.enabled);
-    setStatus(elements.mt5ConnectionStatus, mt5.connected ? "已连接" : "未连接", mt5.connected);
-    setStatus(elements.algoTradingStatus, mt5.terminal_trade_allowed ? "已允许" : "未开启", mt5.terminal_trade_allowed);
-    elements.accountStatus.textContent = `${accountTradeModeLabel(accountTradeMode)} · ${mt5.server || "未知服务器"} · ${mt5.login_masked || "未知账号"}`;
-    elements.accountStatus.className = accountTradeMode === "unknown" ? "bad" : "";
-    elements.accountModeCurrent.textContent = `当前：${accountTradeModeLabel(accountTradeMode)}`;
-    elements.quoteStatus.textContent = mt5.bid && mt5.ask ? `${mt5.bid} / ${mt5.ask}` : "无报价";
-    elements.quoteStatus.className = mt5.bid && mt5.ask ? "good" : "bad";
-    elements.positionStatus.textContent = `多 ${mt5.owned_long_positions} / 空 ${mt5.owned_short_positions}`;
-    elements.positionStatus.className = "";
     elements.webhookUrl.textContent = data.webhook_url || `${window.location.origin}/api/webhooks/tradingview`;
     elements.tradingToggle.checked = data.enabled;
     elements.tradingToggle.disabled = false;
     for (const button of elements.manualActionButtons) {
       button.disabled = !data.enabled;
     }
-    elements.tradingHelp.textContent = mt5.error
-      ? mt5.error
-      : `固定手数 ${data.volume}，灾难保护止损距离 ${data.emergency_sl_distance}。账户模式由 MT5 服务器返回；Prop Firm 模拟资金账户可能显示为 Contest 或 Real 技术模式。`;
-    if (data.clients?.length > 1) {
-      const clients = data.clients;
-      setStatus(elements.mt5ConnectionStatus, `已连接 ${clients.filter((c) => c.mt5.connected).length} / ${clients.length}`, clients.every((c) => c.mt5.connected));
-      setStatus(elements.algoTradingStatus, `已开启 ${clients.filter((c) => c.mt5.terminal_trade_allowed).length} / ${clients.length}`, clients.every((c) => c.mt5.terminal_trade_allowed));
-      elements.accountStatus.textContent = clients.map((c) => `${c.client_id}: ${c.mt5.server || "未知服务器"} · ${c.mt5.login_masked || "未知账号"}`).join("；");
-      elements.accountStatus.className = "";
-      elements.accountModeCurrent.textContent = clients.map((c) => `${c.client_id}: ${accountTradeModeLabel(c.mt5.account_trade_mode)}`).join("；");
-      elements.quoteStatus.textContent = clients.map((c) => `${c.client_id} (${c.mt5.symbol}): ${c.mt5.bid ?? "—"} / ${c.mt5.ask ?? "—"}`).join("；");
-      elements.positionStatus.textContent = clients.map((c) => `${c.client_id}: 多 ${c.mt5.owned_long_positions} / 空 ${c.mt5.owned_short_positions}`).join("；");
-      elements.tradingHelp.textContent = "总开关与客户端开关同时开启才执行。各客户端独立下单并记录结果；停止交易不会自动平仓。";
-    }
+    elements.tradingHelp.textContent = "总开关与客户端开关同时开启才执行；停止交易不会自动平仓。";
   } catch (error) {
     elements.tradingToggle.disabled = false;
-    setStatus(elements.mt5ConnectionStatus, "读取失败", false);
+    setStatus(elements.tradingEnabledStatus, "读取失败", false);
     showNotice(error.message, "error");
   }
 }
@@ -568,11 +559,5 @@ elements.clearSignalsButton.addEventListener("click", clearSignals);
 for (const button of elements.manualActionButtons) {
   button.addEventListener("click", () => submitManualAction(button));
 }
-document.addEventListener("click", (event) => {
-  if (elements.accountModeHelp.open && !elements.accountModeHelp.contains(event.target)) {
-    elements.accountModeHelp.open = false;
-  }
-});
-
 initializeAlertForm();
 refreshDashboard();
