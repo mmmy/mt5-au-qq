@@ -702,6 +702,7 @@ td:last-child {
 .signal-distance-fields input:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .signal-settings-body { min-height: 0; }
 .signal-settings-dialog .detail-dialog-header, .signal-settings-dialog .detail-dialog-footer { flex-shrink: 0; }
+#createAlertDialog .detail-dialog-header, #createAlertDialog .detail-dialog-footer { flex-shrink: 0; }
 .signal-enabled { color: var(--success); }
 .signal-disabled { color: var(--muted); }
 .signal-settings-dialog { width: min(520px, calc(100vw - 32px)); }

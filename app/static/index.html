@@ -98,7 +98,7 @@
 
           <div id="signalSettingsSummary" class="signal-settings-summary" aria-live="polite">正在读取信号配置……</div>
           <p class="form-help">开始时间由后端自动设为当前 K 线开始时间；有效期按自然时间计算，包含休市时间。预计结束：<strong id="alertEndTime">—</strong></p>
-          <div class="create-submit"><span class="form-help">2 分钟周期</span><button id="createButton" class="button button-primary" type="submit">创建警报</button></div>
+          <div class="create-submit"><span class="form-help">2 分钟周期</span><button id="createButton" class="button button-primary" type="submit" aria-haspopup="dialog" aria-controls="createAlertDialog">创建警报</button></div>
         </form>
         <details class="connection-setup">
           <summary>手动配置 TradingView 警报</summary>
@@ -188,6 +188,24 @@
         </div>
       </section>
     </main>
+
+    <dialog id="createAlertDialog" class="detail-dialog" aria-labelledby="createAlertTitle" aria-describedby="createAlertHelp">
+      <form id="confirmCreateForm" class="detail-dialog-content">
+        <header class="detail-dialog-header">
+          <h2 id="createAlertTitle">确认警报参数</h2>
+          <button class="dialog-close-button" type="button" data-close-create-dialog aria-label="返回修改警报参数">×</button>
+        </header>
+        <div class="signal-settings-body">
+          <p id="createAlertHelp" class="form-help">请核对以下参数，确认后创建警报。开始时间以提交时的当前 K 线为准，有效期包含休市时间。</p>
+          <div id="createAlertParameters"></div>
+        </div>
+        <p id="createAlertError" class="dialog-feedback bad" role="alert" hidden></p>
+        <footer class="detail-dialog-footer">
+          <button class="button button-secondary" type="button" data-close-create-dialog autofocus>返回修改</button>
+          <button id="confirmCreateButton" class="button button-primary" type="submit">确认创建</button>
+        </footer>
+      </form>
+    </dialog>
 
     <dialog id="alertParametersDialog" class="detail-dialog" aria-labelledby="alertParametersTitle">
       <div class="detail-dialog-content">

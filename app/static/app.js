@@ -26,6 +26,11 @@ const elements = {
   clearSignalsButton: document.querySelector("#clearSignalsButton"),
 };
 let pendingCreate = null;
+let createDraft = null;
+let creatingAlert = false;
+const createDialog = document.querySelector("#createAlertDialog");
+const confirmCreateButton = document.querySelector("#confirmCreateButton");
+const createError = document.querySelector("#createAlertError");
 let signalSettings = null;
 let savingSignalSettings = false;
 let refreshingDashboard = false;
@@ -660,11 +665,18 @@ async function clearSignals() {
 function openAlertParameters(alert) {
   const dialog = document.getElementById("alertParametersDialog");
   const content = document.getElementById("alertParametersContent");
+  renderAlertParameters(content, alert);
+  dialog.showModal();
+}
+
+function renderAlertParameters(content, alert, { preview = false } = {}) {
   content.replaceChildren();
-  const summary = document.createElement("p");
-  summary.className = "form-help";
-  summary.textContent = "该警报创建时保存的参数，后续配置修改不会改变此记录。";
-  content.append(summary);
+  if (!preview) {
+    const summary = document.createElement("p");
+    summary.className = "form-help";
+    summary.textContent = "该警报创建时保存的参数，后续配置修改不会改变此记录。";
+    content.append(summary);
+  }
   const fields = document.createElement("dl");
   fields.className = "parameter-grid";
   const effectiveHours = alert.valid_bars && Number(alert.resolution)
@@ -676,9 +688,10 @@ function openAlertParameters(alert) {
     ["开仓方向", alert.side],
     ["有效时长", alert.valid_hours ? `${alert.valid_hours} 小时` : effectiveHours ? `${effectiveHours} 小时` : null],
     ["周期", alert.resolution ? `${alert.resolution} 分钟` : null],
-    ["开始时间", alert.start_time_ms ? formatDate(alert.start_time_ms) : null],
-    ["结束时间", alert.end_time_ms ? formatDate(alert.end_time_ms) : null],
+    [preview ? "预计开始时间" : "开始时间", alert.start_time_ms ? formatDate(alert.start_time_ms) : null],
+    [preview ? "预计结束时间" : "结束时间", alert.end_time_ms ? formatDate(alert.end_time_ms) : null],
   ]) {
+    if (preview && (name === "警报 ID" || name === "品种")) continue;
     const label = document.createElement("dt");
     label.textContent = name;
     const text = document.createElement("dd");
@@ -706,7 +719,7 @@ function openAlertParameters(alert) {
     content.append(distances);
     const table = document.createElement("table");
     table.className = "parameter-signals";
-    table.setAttribute("aria-label", "创建时的信号开关");
+    table.setAttribute("aria-label", preview ? "待创建警报的信号开关" : "创建时的信号开关");
     const head = table.createTHead().insertRow();
     for (const text of ["信号", "5 分钟", "2 分钟"]) {
       const cell = document.createElement("th");
@@ -730,7 +743,6 @@ function openAlertParameters(alert) {
     missing.textContent = "此警报未记录创建时的信号开关和价格距离，无法还原这些历史参数。";
     content.append(missing);
   }
-  dialog.showModal();
 }
 
 function renderAlerts(alerts) {
@@ -804,6 +816,7 @@ async function loadAlerts({ quiet = false } = {}) {
 
 async function createAlert(event) {
   event.preventDefault();
+  if (creatingAlert || createDialog.open) return;
   hideNotice();
   if (!signalSettings) {
     showNotice("请先读取信号配置：点击“警报配置”重试。", "error");
@@ -836,10 +849,33 @@ async function createAlert(event) {
     side: alertFormSettings.side,
     valid_hours: validHours,
     resolution: alertResolution,
-    signal_settings: signalSettings,
+    signal_settings: JSON.parse(JSON.stringify(signalSettings)),
   };
+  createDraft = alertConfig;
+  const intervalMs = minutes * 60_000;
+  const startTimeMs = Math.floor(Date.now() / intervalMs) * intervalMs;
+  renderAlertParameters(document.getElementById("createAlertParameters"), {
+    ...alertConfig,
+    prices: prices.split(/[\s,，、;；]+/).filter(Boolean),
+    valid_bars: convertedBars,
+    start_time_ms: startTimeMs,
+    end_time_ms: startTimeMs + convertedBars * intervalMs,
+  }, { preview: true });
+  createError.hidden = true;
+  createDialog.showModal();
+}
+
+async function confirmCreateAlert(event) {
+  event.preventDefault();
+  if (creatingAlert || !createDraft || !createDialog.open) return;
+  const alertConfig = createDraft;
   const requestKey = JSON.stringify(alertConfig);
 
+  creatingAlert = true;
+  createError.hidden = true;
+  confirmCreateButton.disabled = true;
+  confirmCreateButton.textContent = "创建中……";
+  for (const button of createDialog.querySelectorAll("[data-close-create-dialog]")) button.disabled = true;
   elements.createButton.disabled = true;
   elements.createButton.textContent = "创建中……";
   if (!pendingCreate || pendingCreate.key !== requestKey) {
@@ -856,13 +892,19 @@ async function createAlert(event) {
       ? `警报创建成功：${result.alert.side}，${result.alert.resolution} 分钟，实际有效 ${formatHours(actualHours)} 小时（${result.alert.valid_bars} 根 K 线）`
       : "该请求对应的警报已经存在，未重复创建";
     showNotice(message);
+    createDialog.close();
     pendingCreate = null;
     elements.prices.value = "";
     updatePriceFeedback();
     await loadAlerts({ quiet: true });
   } catch (error) {
-    showNotice(error.message, "error");
+    createError.textContent = `${error.message}。请重试，或返回修改参数。`;
+    createError.hidden = false;
   } finally {
+    creatingAlert = false;
+    confirmCreateButton.disabled = false;
+    confirmCreateButton.textContent = "确认创建";
+    for (const button of createDialog.querySelectorAll("[data-close-create-dialog]")) button.disabled = false;
     elements.createButton.disabled = false;
     elements.createButton.textContent = "创建警报";
   }
@@ -934,6 +976,15 @@ async function refreshDashboard() {
 }
 
 elements.form.addEventListener("submit", createAlert);
+document.querySelector("#confirmCreateForm").addEventListener("submit", confirmCreateAlert);
+for (const button of document.querySelectorAll("[data-close-create-dialog]")) {
+  button.addEventListener("click", () => { if (!creatingAlert) createDialog.close(); });
+}
+createDialog.addEventListener("cancel", (event) => { if (creatingAlert) event.preventDefault(); });
+createDialog.addEventListener("close", () => { createDraft = null; });
+createDialog.addEventListener("click", (event) => {
+  if (event.target === createDialog && !creatingAlert) createDialog.close();
+});
 elements.prices.addEventListener("input", updatePriceFeedback);
 
 const priceHelpButton = document.getElementById("priceHelpButton");
