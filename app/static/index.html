@@ -2,37 +2,43 @@
 <html lang="zh-CN">
   <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
     <title>TradingView 警报管理</title>
+    <script src="/static/theme.js"></script>
     <link rel="stylesheet" href="/static/style.css">
   </head>
   <body>
     <main class="page-shell">
       <header class="page-header">
         <div>
-          <p class="eyebrow">MT5 · XAUUSD</p>
           <h1>TradingView 警报管理</h1>
-          <p class="subtitle">创建、查看和删除黄金价格策略警报</p>
+          <p class="subtitle">MT5 · XAUUSD <span class="header-divider">/</span> 黄金价格策略警报</p>
         </div>
-        <button id="refreshButton" class="button button-secondary" type="button">刷新全部</button>
+        <div class="refresh-control">
+          <span id="lastUpdated" class="form-help">尚未刷新</span>
+          <div class="header-actions">
+            <button id="themeButton" class="button button-secondary" type="button">白色主题</button>
+            <button id="refreshButton" class="button button-secondary" type="button">刷新全部</button>
+          </div>
+        </div>
       </header>
+      <nav class="section-nav" aria-label="页面区域">
+        <a href="#tradingTitle">交易控制</a>
+        <a href="#createTitle">创建警报</a>
+        <a href="#listTitle">当前警报</a>
+        <a href="#signalTitle">信号记录</a>
+      </nav>
+      <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
 
       <section class="panel trading-panel" aria-labelledby="tradingTitle">
         <div class="panel-heading trading-heading">
           <div>
             <h2 id="tradingTitle">MT5 交易控制</h2>
-            <p>仅管理 magic number 属于本程序的 XAUUSD 仓位。</p>
-          </div>
-          <div class="trading-master-control">
-            <span>交易总开关</span>
-            <strong id="tradingEnabledStatus">读取中</strong>
-            <label class="switch" title="启用或停止所有客户端的程序交易">
-              <input id="tradingToggle" type="checkbox" role="switch" aria-label="交易总开关" disabled>
-              <span class="switch-slider" aria-hidden="true"></span>
-            </label>
+            <p>只操作本程序建立的持仓，不影响手动交易或其他程序的持仓。</p>
           </div>
         </div>
 
+        <p id="executionStatus" class="execution-status" role="status">正在检查账户执行条件……</p>
         <div class="client-table-wrap">
           <table class="client-table" aria-label="MT5 客户端配置和状态">
             <thead>
@@ -41,80 +47,38 @@
                 <th>连接</th>
                 <th>账户</th>
                 <th>品种</th>
-                <th>手数</th>
-                <th>报价（买 / 卖）</th>
+                <th>开仓手数</th>
                 <th>持仓</th>
                 <th>算法交易</th>
                 <th>交易开关</th>
+                <th class="actions-column">操作</th>
               </tr>
             </thead>
             <tbody id="mt5Clients"><tr><td colspan="9">正在读取客户端……</td></tr></tbody>
           </table>
         </div>
 
-        <div class="webhook-box">
-          <div>
-            <span>本机 TradingView Webhook URL</span>
-            <code id="webhookUrl">读取中……</code>
-          </div>
-          <button id="copyWebhookButton" class="button button-secondary" type="button">复制</button>
-        </div>
 
-        <div class="webhook-box">
-          <div>
-            <span>TradingView 警报消息 JSON</span>
-            <p class="webhook-message-summary">用于创建 TradingView 策略警报时填写的消息内容。</p>
-          </div>
-          <button id="openWebhookMessageButton" class="button button-secondary" type="button">查看详情</button>
-        </div>
-
-        <div class="manual-actions" aria-label="MT5 手动平仓操作">
-          <label for="manualClient">执行客户端</label>
-          <select id="manualClient"><option value="">所有已启用客户端</option></select>
-          <button class="button action-button" type="button" data-trade-action="close_long">平多</button>
-          <button class="button action-button" type="button" data-trade-action="close_short">平空</button>
-        </div>
-        <p class="form-help trading-help" id="tradingHelp">开关状态会自动保存，并在程序重启后恢复。</p>
       </section>
 
       <section class="panel create-panel" aria-labelledby="createTitle">
         <div class="panel-heading">
           <div>
             <h2 id="createTitle">创建警报</h2>
-            <p>输入 1～20 个价格，可使用空格、回车或逗号分隔。</p>
           </div>
+          <button id="openSignalSettingsButton" class="button button-secondary" type="button" aria-haspopup="dialog">警报配置</button>
         </div>
         <form id="createForm" class="create-form">
-          <div class="alert-config-grid">
-            <div class="form-field">
-              <label for="alertSide">开仓方向</label>
-              <select id="alertSide" name="side">
-                <option value="自动" selected>自动</option>
-                <option value="看多">看多</option>
-                <option value="看空">看空</option>
-              </select>
-            </div>
-            <div class="form-field">
-              <label for="alertResolution">警报时间级别</label>
-              <select id="alertResolution" name="resolution">
-                <option value="1">1 分钟</option>
-                <option value="2" selected>2 分钟</option>
-                <option value="3">3 分钟</option>
-                <option value="5">5 分钟</option>
-                <option value="15">15 分钟</option>
-                <option value="30">30 分钟</option>
-                <option value="60">1 小时</option>
-                <option value="120">2 小时</option>
-                <option value="240">4 小时</option>
-              </select>
-            </div>
-            <div class="form-field">
-              <label for="validHours">有效时长（小时）</label>
-              <input id="validHours" name="valid_hours" type="number" min="0.01" max="40000" step="0.01" value="24" required>
-            </div>
+          <div class="price-label-row">
+            <label for="prices">价格</label>
+            <button id="priceHelpButton" class="help-button" type="button" aria-label="价格输入说明" aria-describedby="priceInputTip" aria-controls="priceInputTip" aria-expanded="false">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                <circle cx="12" cy="12" r="9"/>
+                <path d="M12 10.5v6M12 7.5v.5"/>
+              </svg>
+            </button>
           </div>
-
-          <label for="prices">价格</label>
+          <div id="priceInputTip" class="input-tooltip" popover="auto" role="tooltip">输入 1～20 个价格，可使用空格、换行或逗号分隔。价格必须大于 0，不能重复。</div>
           <div class="input-row">
             <textarea
               id="prices"
@@ -125,16 +89,39 @@
               maxlength="1000"
               rows="3"
               required
+              aria-describedby="priceFeedback"
             ></textarea>
-            <button id="createButton" class="button button-primary" type="submit">创建警报</button>
           </div>
-          <p class="form-help">价格必须大于 0，不能重复；最多支持 20 个价格。支持空格、回车、制表符、中英文逗号或分号分隔。</p>
-          <p class="form-help">小时数会按当前周期向上换算为 K 线数：<strong id="validBarsPreview">—</strong></p>
-          <p class="form-help">开始时间由后端自动设为当前 K 线开始时间；有效期按自然时间计算，包含休市时间。预计结束：<strong id="alertEndTime">—</strong></p>
-        </form>
-      </section>
+          <p id="priceFeedback" class="form-help" aria-live="polite">已输入 0 / 20 个价格</p>
 
-      <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+          <p id="alertConfigSummary" class="alert-config-summary">开仓方向：自动 · 有效时长：24 小时</p>
+
+          <div id="signalSettingsSummary" class="signal-settings-summary" aria-live="polite">正在读取信号配置……</div>
+          <p class="form-help">开始时间由后端自动设为当前 K 线开始时间；有效期按自然时间计算，包含休市时间。预计结束：<strong id="alertEndTime">—</strong></p>
+          <div class="create-submit"><span class="form-help">2 分钟周期</span><button id="createButton" class="button button-primary" type="submit">创建警报</button></div>
+        </form>
+        <details class="connection-setup">
+          <summary>手动配置 TradingView 警报</summary>
+          <p class="manual-setup-help form-help">仅在 TradingView 中手动创建策略警报时使用。在本页创建警报会自动填写以下内容。</p>
+        <div class="webhook-box">
+          <div>
+            <span>Webhook URL</span>
+            <p class="webhook-message-summary">复制到 TradingView 创建警报窗口的「Webhook URL」栏。</p>
+            <code id="webhookUrl">读取中……</code>
+          </div>
+          <button id="copyWebhookButton" disabled class="button button-secondary" type="button">复制 URL</button>
+        </div>
+
+        <div class="webhook-box">
+          <div>
+            <span>TradingView 警报消息 JSON</span>
+            <p class="webhook-message-summary">复制到 TradingView 创建警报窗口的「消息」栏。</p>
+          </div>
+          <button id="openWebhookMessageButton" class="button button-secondary" type="button">查看并复制 JSON</button>
+        </div>
+
+        </details>
+      </section>
 
       <section class="panel" aria-labelledby="listTitle">
         <div class="panel-heading list-heading">
@@ -145,8 +132,8 @@
           <span id="loadingIndicator" class="loading-indicator" hidden>同步中</span>
         </div>
 
-        <div class="table-wrap">
-          <table>
+        <div class="table-wrap" tabindex="0" role="region" aria-label="当前警报列表">
+          <table class="responsive-data-table">
             <thead>
               <tr>
                 <th>状态</th>
@@ -166,6 +153,7 @@
           <div id="emptyState" class="empty-state" hidden>
             <p>还没有本项目创建的警报。</p>
             <span>在上方输入价格即可创建。</span>
+            <a class="empty-link" href="#prices">输入第一个价格</a>
           </div>
         </div>
       </section>
@@ -178,8 +166,8 @@
           </div>
           <button id="clearSignalsButton" class="button button-secondary" type="button">清除记录</button>
         </div>
-        <div class="table-wrap">
-          <table>
+        <div class="table-wrap" tabindex="0" role="region" aria-label="交易信号记录列表">
+          <table class="responsive-data-table">
             <thead>
               <tr>
                 <th>接收时间</th>
@@ -187,6 +175,7 @@
                 <th>动作</th>
                 <th>状态</th>
                 <th>品种</th>
+                <th>触发价格</th>
                 <th>结果</th>
               </tr>
             </thead>
@@ -200,21 +189,66 @@
       </section>
     </main>
 
+    <dialog id="alertParametersDialog" class="detail-dialog" aria-labelledby="alertParametersTitle">
+      <div class="detail-dialog-content">
+        <header class="detail-dialog-header">
+          <h2 id="alertParametersTitle">创建时参数</h2>
+          <button class="dialog-close-button" type="button" data-close-alert-parameters aria-label="关闭创建时参数">×</button>
+        </header>
+        <div id="alertParametersContent" class="signal-settings-body"></div>
+        <footer class="detail-dialog-footer">
+          <button class="button button-secondary" type="button" data-close-alert-parameters>关闭</button>
+        </footer>
+      </div>
+    </dialog>
+
     <dialog id="webhookMessageDialog" class="detail-dialog" aria-labelledby="webhookMessageDialogTitle">
       <div class="detail-dialog-content">
         <header class="detail-dialog-header">
           <div>
-            <p class="eyebrow">TradingView</p>
             <h2 id="webhookMessageDialogTitle">警报消息 JSON</h2>
           </div>
           <button class="dialog-close-button" type="button" data-close-webhook-dialog aria-label="关闭弹窗">×</button>
         </header>
         <textarea id="webhookMessage" readonly spellcheck="false" aria-label="TradingView 警报消息 JSON">读取中……</textarea>
+        <p id="webhookCopyError" class="dialog-feedback bad" role="alert" hidden></p>
         <footer class="detail-dialog-footer">
           <button class="button button-secondary" type="button" data-close-webhook-dialog>关闭</button>
-          <button id="copyWebhookMessageButton" class="button button-primary" type="button">复制 JSON</button>
+          <button id="copyWebhookMessageButton" disabled class="button button-primary" type="button">复制 JSON</button>
         </footer>
       </div>
+    </dialog>
+
+    <dialog id="signalSettingsDialog" class="detail-dialog signal-settings-dialog" aria-labelledby="signalSettingsTitle" aria-describedby="signalSettingsHelp">
+      <form id="signalSettingsForm" class="detail-dialog-content">
+        <header class="detail-dialog-header">
+          <h2 id="signalSettingsTitle">警报配置</h2>
+          <button class="dialog-close-button" type="button" data-close-signal-dialog aria-label="关闭警报配置">×</button>
+        </header>
+        <div class="signal-settings-body">
+          <p id="signalSettingsHelp" class="form-help">设置开仓方向、有效时长、价格距离和信号周期。保存后供新警报使用，已有警报保持原配置。</p>
+          <div class="alert-config-grid">
+            <div class="form-field">
+              <label for="alertSide">开仓方向</label>
+              <select id="alertSide" name="side">
+                <option value="自动" selected>自动</option>
+                <option value="看多">看多</option>
+                <option value="看空">看空</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label for="validHours">有效时长（小时）</label>
+              <input id="validHours" name="valid_hours" type="number" min="0.01" max="40000" step="0.01" value="24" required>
+            </div>
+          </div>
+          <div id="signalSettingsFields"></div>
+          <p id="signalSettingsError" class="signal-settings-error" role="alert" hidden></p>
+        </div>
+        <footer class="detail-dialog-footer">
+          <button class="button button-secondary" type="button" data-close-signal-dialog>取消</button>
+          <button id="saveSignalSettingsButton" class="button button-primary" type="submit">保存配置</button>
+        </footer>
+      </form>
     </dialog>
 
     <script src="/static/app.js" defer></script>

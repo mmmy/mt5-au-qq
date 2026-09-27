@@ -5,7 +5,28 @@ from enum import StrEnum
 from typing import Any, Literal
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, StrictBool
+
+
+class SignalTimeframes(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    minute_5: StrictBool
+    minute_2: StrictBool
+
+
+class AlertSignalSettings(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    fractal: SignalTimeframes
+    pinbar: SignalTimeframes
+    pinbar_more: SignalTimeframes
+    insidebar: SignalTimeframes
+    engulfing: SignalTimeframes
+    # Optional for compatibility with configurations saved before price distances.
+    price_delta: float | None = Field(default=None, ge=0, strict=True, allow_inf_nan=False)
+    entry_delta: float | None = Field(default=None, ge=0, strict=True, allow_inf_nan=False)
+    stop_delta: float | None = Field(default=None, ge=0, strict=True, allow_inf_nan=False)
 
 
 class CreateAlertRequest(BaseModel):
@@ -15,6 +36,7 @@ class CreateAlertRequest(BaseModel):
     valid_hours: Decimal | None = Field(default=None, gt=0, le=40_000)
     start_time_ms: int | None = Field(default=None, gt=0)
     resolution: Literal["1", "2", "3", "5", "15", "30", "60", "120", "240"] = "2"
+    signal_settings: AlertSignalSettings | None = None
     request_id: UUID = Field(default_factory=uuid4)
 
 
@@ -31,6 +53,8 @@ class AlertItem(BaseModel):
     valid_bars: int | None = None
     start_time_ms: int | None = None
     end_time_ms: int | None = None
+    valid_hours: str | None = None
+    signal_settings: AlertSignalSettings | None = None
 
 
 class CreateAlertResponse(BaseModel):
@@ -92,6 +116,7 @@ class SignalItem(BaseModel):
     action: str
     status: str
     symbol: str
+    trigger_price: str | None = None
     error: str | None = None
     received_at: str
     executed_at: str | None = None
@@ -130,6 +155,9 @@ class Mt5Status(BaseModel):
     symbol_available: bool
     bid: float | None = None
     ask: float | None = None
+    volume_min: float | None = None
+    volume_max: float | None = None
+    volume_step: float | None = None
     owned_long_positions: int = 0
     owned_short_positions: int = 0
     error: str | None = None
@@ -139,14 +167,28 @@ class ClientRuntimeStatus(BaseModel):
     client_id: str
     enabled: bool
     volume: float
+    max_volume: float | None = None
     mt5: Mt5Status
+
+
+class ClientVolumeRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    volume: float = Field(gt=0, strict=True, allow_inf_nan=False)
+
+
+class ClientVolumeResponse(BaseModel):
+    client_id: str
+    volume: float
+    max_volume: float | None = None
+    message: str
 
 
 class TradingRuntimeStatus(BaseModel):
     enabled: bool
     webhook_url: str
     volume: float
-    max_volume: float
+    max_volume: float | None = None
     emergency_sl_distance: float
     demo_only: bool
     mt5: Mt5Status

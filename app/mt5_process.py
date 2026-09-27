@@ -19,7 +19,15 @@ def _serve(connection, config: Mt5ClientConfig, gateway_factory=Mt5Gateway) -> N
             if operation == "stop":
                 break
             try:
-                result = gateway.status() if operation == "status" else gateway.execute(argument)
+                if operation == "status":
+                    result = gateway.status()
+                elif operation == "execute":
+                    action, volume = argument
+                    if volume is not None:
+                        gateway.volume = volume
+                    result = gateway.execute(action)
+                else:
+                    raise ValueError(f"不支持的 MT5 操作：{operation}")
                 connection.send((True, result))
             except Exception as exc:
                 connection.send((False, str(exc)))
@@ -73,8 +81,8 @@ class ProcessMt5Gateway:
     def status(self):
         return self._call("status")
 
-    def execute(self, action):
-        return self._call("execute", action)
+    def execute(self, action, *, volume=None):
+        return self._call("execute", (action, volume))
 
     def shutdown(self):
         with self._lock:

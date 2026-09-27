@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+import math
 from datetime import datetime, timezone
 from uuid import uuid4
 
 from app.config import Settings
 from app.errors import Mt5NotReadyError, TradingDisabledError, ValidationError
-from app.models import (ClientRuntimeStatus, ManualActionResponse, Mt5Status, TradeAction,
+from app.models import (ClientRuntimeStatus, ClientVolumeRequest, ClientVolumeResponse, ManualActionResponse, Mt5Status, TradeAction,
                         TradingRuntimeStatus, TradingToggleResponse, WebhookResponse)
 from app.mt5_process import ProcessMt5Gateway
 from app.trading_service import (MANUAL_ACTIONS, TRADING_ENABLED_SETTING, Mt5Worker,
@@ -22,19 +23,28 @@ class MultiTradingService(TradingService):
             emergency_sl_distance=first.emergency_sl_distance, demo_only=first.demo_only,
             signal_max_age_seconds=settings.signal_max_age_seconds,
             enabled_at_start=settings.trading_enabled_at_start)
-        self.client_enabled = {key: True for key in self.configs}
+        self.client_enabled = {key: False for key in self.configs}
         self.workers = {key: Mt5Worker(repository, gateway_factory(config),
-            lambda key=key: self.is_enabled() and self.client_enabled[key],
+            lambda key=key: self.client_enabled[key],
             client_id=key, signal_max_age_seconds=self.signal_max_age_seconds)
             for key, config in self.configs.items()}
 
     def start(self):
         self.repository.initialize()
-        saved = self.repository.get_runtime_setting(TRADING_ENABLED_SETTING)
-        self._set_enabled(self._enabled_at_start if saved is None else saved == "1")
-        for key, worker in self.workers.items():
+        migrated = self.repository.get_runtime_setting("independent_client_switches") == "1"
+        legacy_master = self.repository.get_runtime_setting(TRADING_ENABLED_SETTING)
+        for key in self.workers:
             saved = self.repository.get_runtime_setting(f"trading_enabled_{key}")
-            self.client_enabled[key] = saved != "0"
+            # Preserve the old effective state once; a stopped master must not
+            # unexpectedly activate previously enabled clients on upgrade.
+            if not migrated and legacy_master is not None:
+                enabled = legacy_master == "1" and saved != "0"
+            else:
+                enabled = self._enabled_at_start if saved is None else saved == "1"
+            self.client_enabled[key] = enabled
+            self.repository.set_runtime_setting(f"trading_enabled_{key}", "1" if enabled else "0")
+        self.repository.set_runtime_setting("independent_client_switches", "1")
+        for worker in self.workers.values():
             worker.start()
         for signal_id in self.repository.recover_client_tasks(list(self.configs)):
             key = self.repository.get_signal(signal_id)["client_id"]
@@ -63,10 +73,32 @@ class MultiTradingService(TradingService):
     async def runtime_status(self, *, webhook_url=None):
         statuses = await asyncio.gather(*(self._status(key) for key in self.configs))
         clients = [ClientRuntimeStatus(client_id=key, enabled=self.client_enabled[key],
-            volume=config.volume, mt5=status) for (key, config), status in zip(self.configs.items(), statuses)]
+            volume=self.client_volume(key), mt5=status)
+            for (key, config), status in zip(self.configs.items(), statuses)]
         return TradingRuntimeStatus(enabled=self.is_enabled(), webhook_url=webhook_url or self.webhook_url or "",
-            volume=self.volume, max_volume=self.max_volume, emergency_sl_distance=self.emergency_sl_distance,
+            volume=clients[0].volume, emergency_sl_distance=self.emergency_sl_distance,
             demo_only=self.demo_only, mt5=statuses[0], clients=clients)
+
+    def client_volume(self, key):
+        saved = self.repository.get_runtime_setting(f"mt5_volume_{key}")
+        return ClientVolumeRequest(volume=float(saved)).volume if saved is not None else self.configs[key].volume
+
+    async def set_client_volume(self, key, volume):
+        if key not in self.configs:
+            raise ValidationError("未知 MT5 客户端")
+        if not math.isfinite(volume) or volume <= 0:
+            raise ValidationError("开仓手数必须是大于 0 的有限数值")
+        status = await self._status(key)
+        if status.volume_min is not None and volume < status.volume_min:
+            raise ValidationError(f"开仓手数不能小于品种最小手数 {status.volume_min}")
+        if status.volume_max is not None and volume > status.volume_max:
+            raise ValidationError(f"开仓手数不能超过品种最大手数 {status.volume_max}")
+        step = status.volume_step
+        if step and not math.isclose(round(volume / step) * step, volume, rel_tol=0, abs_tol=1e-8):
+            raise ValidationError(f"开仓手数必须符合品种步进 {step}")
+        self.repository.set_runtime_setting(f"mt5_volume_{key}", str(volume))
+        return ClientVolumeResponse(client_id=key, volume=volume,
+            message=f"客户端 {key} 开仓手数已保存为 {volume} 手，后续开仓和反手时使用")
 
     def _ready_error(self, key, status):
         if status.error:
@@ -79,13 +111,14 @@ class MultiTradingService(TradingService):
         return None
 
     async def enable(self):
-        statuses = await asyncio.gather(*(self._status(key) for key in self.configs))
-        ready = [key for key, status in zip(self.configs, statuses)
-                 if self.client_enabled[key] and not self._ready_error(key, status)]
-        if not ready:
-            raise Mt5NotReadyError("没有已启用且就绪的 MT5 客户端")
-        self._set_enabled(True)
-        return TradingToggleResponse(enabled=True, message="交易总开关已启用；各客户端独立执行并记录结果")
+        raise ValidationError("总开关已移除，请使用各客户端的交易开关")
+
+    def disable(self):
+        raise ValidationError("总开关已移除，请使用各客户端的交易开关")
+
+    def is_enabled(self):
+        # Compatibility summary only; never gates individual client execution.
+        return any(self.client_enabled.values())
 
     async def toggle_client(self, key, enabled):
         if key not in self.configs:
@@ -101,7 +134,7 @@ class MultiTradingService(TradingService):
     def _fanout(self, signal_id, source, action, payload, target=None):
         if target is not None and target not in self.configs:
             raise ValidationError("未知 MT5 客户端")
-        clients = [(key, config.symbol, self.is_enabled() and self.client_enabled[key])
+        clients = [(key, config.symbol, self.client_enabled[key])
                    for key, config in self.configs.items() if target is None or target == key]
         inserted = self.repository.insert_fanout(signal_id=signal_id, source=source,
             action=action.value, symbol=self.symbol, payload=payload, clients=clients)
@@ -132,7 +165,7 @@ class MultiTradingService(TradingService):
             raise ValidationError("手动测试只支持开多、开空、平多、平空")
         if client_id is not None and client_id not in self.configs:
             raise ValidationError("未知 MT5 客户端")
-        if not self.is_enabled() or not any(active for key, active in self.client_enabled.items()
+        if not any(active for key, active in self.client_enabled.items()
                                             if client_id is None or key == client_id):
             raise TradingDisabledError()
         signal_id = "manual-" + uuid4().hex

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from datetime import datetime, timezone
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
@@ -83,6 +84,10 @@ class TradeRepository:
                 connection.execute("ALTER TABLE trade_signals ADD COLUMN client_id TEXT")
             if "parent_signal_id" not in columns:
                 connection.execute("ALTER TABLE trade_signals ADD COLUMN parent_signal_id TEXT")
+            alert_columns = {row["name"] for row in connection.execute("PRAGMA table_info(tv_alert_configs)")}
+            for column in ("signal_settings_json", "valid_hours"):
+                if column not in alert_columns:
+                    connection.execute(f"ALTER TABLE tv_alert_configs ADD COLUMN {column} TEXT")
             order_columns = {row["name"] for row in connection.execute("PRAGMA table_info(trade_orders)")}
             if "client_id" not in order_columns:
                 connection.execute("ALTER TABLE trade_orders ADD COLUMN client_id TEXT NOT NULL DEFAULT 'A'")
@@ -188,7 +193,7 @@ class TradeRepository:
         with self._connect() as connection:
             rows = connection.execute(
                 """
-                SELECT signal_id, source, action, status, symbol, error, received_at, executed_at
+                SELECT signal_id, source, action, status, symbol, error, received_at, executed_at, payload_json
                 FROM trade_signals
                 WHERE hidden_at IS NULL AND parent_signal_id IS NULL
                 ORDER BY received_at DESC
@@ -199,6 +204,19 @@ class TradeRepository:
             items = []
             for row in rows:
                 item = self._row_to_dict(row)
+                raw_payload = item.pop("payload_json")
+                item["trigger_price"] = None
+                if item["source"] == "tradingview":
+                    try:
+                        payload = json.loads(raw_payload)
+                        raw_price = payload.get("price") if isinstance(payload, dict) else None
+                        if isinstance(raw_price, (str, int, float)) and not isinstance(raw_price, bool):
+                            price = str(raw_price).strip()
+                            number = Decimal(price)
+                            if number.is_finite() and number > 0:
+                                item["trigger_price"] = price
+                    except (ValueError, TypeError, InvalidOperation):
+                        pass
                 children = connection.execute("SELECT client_id, status, symbol, error FROM trade_signals WHERE parent_signal_id=? ORDER BY client_id", (item["signal_id"],)).fetchall()
                 item["executions"] = [self._row_to_dict(child) for child in children]
                 items.append(SignalItem(**item))
@@ -290,20 +308,24 @@ class TradeRepository:
         start_time_ms: int,
         end_time_ms: int,
         resolution: str,
+        signal_settings: dict[str, Any] | None = None,
+        valid_hours: str | None = None,
     ) -> None:
         with self._connect() as connection:
             connection.execute(
                 """
                 INSERT INTO tv_alert_configs
-                    (alert_id, prices_json, side, valid_bars, start_time_ms, end_time_ms, resolution, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    (alert_id, prices_json, side, valid_bars, start_time_ms, end_time_ms, resolution, created_at, signal_settings_json, valid_hours)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(alert_id) DO UPDATE SET
                     prices_json = excluded.prices_json,
                     side = excluded.side,
                     valid_bars = excluded.valid_bars,
                     start_time_ms = excluded.start_time_ms,
                     end_time_ms = excluded.end_time_ms,
-                    resolution = excluded.resolution
+                    resolution = excluded.resolution,
+                    signal_settings_json = COALESCE(excluded.signal_settings_json, tv_alert_configs.signal_settings_json),
+                    valid_hours = COALESCE(excluded.valid_hours, tv_alert_configs.valid_hours)
                 """,
                 (
                     alert_id,
@@ -314,6 +336,8 @@ class TradeRepository:
                     end_time_ms,
                     resolution,
                     utc_now(),
+                    json.dumps(signal_settings, ensure_ascii=False) if signal_settings is not None else None,
+                    valid_hours,
                 ),
             )
 
@@ -330,6 +354,8 @@ class TradeRepository:
         for row in rows:
             item = self._row_to_dict(row)
             item["prices"] = json.loads(item.pop("prices_json"))
+            snapshot = item.pop("signal_settings_json")
+            item["signal_settings"] = json.loads(snapshot) if snapshot is not None else None
             result[int(item["alert_id"])] = item
         return result
 

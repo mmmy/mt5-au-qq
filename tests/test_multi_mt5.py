@@ -14,6 +14,7 @@ from app.mt5_gateway import ExecutedOrder, Mt5ExecutionError, Mt5Gateway
 from app.mt5_process import ProcessMt5Gateway
 from app.multi_trading_service import MultiTradingService
 from app.trade_repository import TradeRepository
+from app.errors import TradingDisabledError
 
 
 class SimulatedGateway:
@@ -27,9 +28,11 @@ class SimulatedGateway:
         return Mt5Status(initialized=True, connected=True, terminal_trade_allowed=True,
             account_trade_allowed=True, account_trade_expert=True, demo_account=True,
             symbol=self.symbol, symbol_available=True, server=str(os.getpid()),
-            owned_long_positions=self.count)
+            owned_long_positions=self.count, volume_min=0.01, volume_max=10, volume_step=0.01)
 
-    def execute(self, action):
+    def execute(self, action, *, volume=None):
+        if volume is not None:
+            self.volume = volume
         if self.symbol == "FAIL":
             raise RuntimeError("模拟下单失败")
         if self.symbol == "SLOW":
@@ -102,7 +105,8 @@ def test_fanout_deduplication_and_independent_failure(tmp_path):
         gateway_factory=lambda c: SimulatedGateway(symbol=c.symbol, volume=c.volume))
     service.start()
     try:
-        asyncio.run(service.enable())
+        asyncio.run(service.toggle_client("A", True))
+        asyncio.run(service.toggle_client("B", True))
         payload = webhook()
         first = service.ingest_webhook(payload)
         second = service.ingest_webhook(payload)
@@ -126,7 +130,8 @@ def test_client_switch_manual_target_and_persistence(tmp_path):
     service = MultiTradingService(repo, settings(), gateway_factory=factory)
     service.start()
     try:
-        asyncio.run(service.enable())
+        asyncio.run(service.toggle_client("A", True))
+        asyncio.run(service.toggle_client("B", True))
         asyncio.run(service.toggle_client("B", False))
         result = service.submit_manual_action(TradeAction.CLOSE_LONG, "A")
         assert wait_completed(repo, result.signal_id)["status"] == "success"
@@ -144,6 +149,82 @@ def test_client_switch_manual_target_and_persistence(tmp_path):
     restored.start()
     try:
         assert restored.is_enabled() and not restored.client_enabled["B"]
+    finally:
+        restored.stop()
+
+
+@pytest.mark.parametrize("legacy_enabled", [False, True])
+def test_migration_preserves_effective_client_state_and_removes_master_gate(tmp_path, legacy_enabled):
+    repo = TradeRepository(tmp_path / "migration.db")
+    repo.initialize()
+    repo.set_runtime_setting("trading_enabled", "1" if legacy_enabled else "0")
+    repo.set_runtime_setting("trading_enabled_A", "1")
+    repo.set_runtime_setting("trading_enabled_B", "0")
+    factory = lambda c: SimulatedGateway(symbol=c.symbol, volume=c.volume)
+    service = MultiTradingService(repo, settings(), gateway_factory=factory)
+    service.start()
+    try:
+        assert service.client_enabled == {"A": legacy_enabled, "B": False}
+        asyncio.run(service.toggle_client("A", True))
+        # Even a legacy stopped master cannot block A after migration.
+        repo.set_runtime_setting("trading_enabled", "0")
+        result = service.ingest_webhook(webhook())
+        assert wait_completed(repo, result.signal_id)["status"] == "partial"
+        executions = repo.list_signals()[0].executions
+        assert {item["client_id"]: item["status"] for item in executions} == {"A": "success", "B": "blocked"}
+        with pytest.raises(TradingDisabledError):
+            service.submit_manual_action(TradeAction.CLOSE_LONG, "B")
+        manual = service.submit_manual_action(TradeAction.CLOSE_LONG, "A")
+        assert wait_completed(repo, manual.signal_id)["status"] == "success"
+    finally:
+        service.stop()
+    restored = MultiTradingService(repo, settings(), gateway_factory=factory)
+    restored.start()
+    try:
+        assert restored.client_enabled == {"A": True, "B": False}
+        asyncio.run(restored.toggle_client("A", False))
+        asyncio.run(restored.toggle_client("B", True))
+        result = restored.ingest_webhook(webhook())
+        assert wait_completed(repo, result.signal_id)["status"] == "partial"
+        assert repo.get_signal(result.signal_id + ":A")["status"] == "blocked"
+        assert repo.get_signal(result.signal_id + ":B")["status"] == "success"
+    finally:
+        restored.stop()
+
+
+def test_account_volumes_apply_to_webhooks_and_survive_restart(tmp_path):
+    repo = TradeRepository(tmp_path / "volumes.db")
+    factory = lambda c: SimulatedGateway(symbol=c.symbol, volume=c.volume)
+    service = MultiTradingService(repo, settings(), gateway_factory=factory)
+    service.start()
+    try:
+        asyncio.run(service.set_client_volume("A", 0.2))
+        asyncio.run(service.set_client_volume("B", 0.3))
+        asyncio.run(service.toggle_client("A", True))
+        asyncio.run(service.toggle_client("B", True))
+        result = service.ingest_webhook(webhook())
+        assert wait_completed(repo, result.signal_id)["status"] == "success"
+        assert {o.client_id: o.volume for o in repo.list_orders()} == {"A": 0.2, "B": 0.3}
+        for volume in (0, -1, 10.01, 0.005, 0.015, float("inf"), float("nan")):
+            with pytest.raises(Exception, match="手数"):
+                asyncio.run(service.set_client_volume("A", volume))
+        with pytest.raises(Exception, match="未知"):
+            asyncio.run(service.set_client_volume("C", 0.2))
+        assert service.client_volume("A") == 0.2
+    finally:
+        service.stop()
+    restored = MultiTradingService(repo, settings(), gateway_factory=factory)
+    restored.start()
+    try:
+        status = asyncio.run(restored.runtime_status())
+        assert [c.volume for c in status.clients] == [0.2, 0.3]
+        assert [c.max_volume for c in status.clients] == [None, None]
+        result = restored.ingest_webhook(webhook().model_copy(update={
+            "prev_market_position": "long", "market_position": "short", "order_id": "reverse",
+        }))
+        assert wait_completed(repo, result.signal_id)["status"] == "success"
+        orders = [o for o in repo.list_orders() if o.action == "reverse_to_short"]
+        assert {o.client_id: o.volume for o in orders} == {"A": 0.2, "B": 0.3}
     finally:
         restored.stop()
 
@@ -239,12 +320,32 @@ def test_api_with_two_spawned_simulated_terminals(tmp_path, monkeypatch):
         status = client.get("/api/trading/status").json()
         assert len(status["clients"]) == 2 and not status["enabled"]
         assert status["clients"][0]["mt5"]["server"] != status["clients"][1]["mt5"]["server"]
-        assert client.post("/api/trading/enable").status_code == 200
+        assert client.post("/api/trading/enable").status_code == 404
+        assert client.post("/api/trading/disable").status_code == 404
+        assert client.post("/api/trading/clients/A/enable").status_code == 200
+        assert client.post("/api/trading/clients/B/enable").status_code == 200
+        assert client.put("/api/trading/clients/A/volume", json={"volume": 0.2}).status_code == 200
+        assert client.put("/api/trading/clients/B/volume", json={"volume": 0.3}).status_code == 200
+        for invalid in (0, -1, "0.2", True):
+            assert client.put("/api/trading/clients/A/volume", json={"volume": invalid}).status_code == 422
+        for invalid in (10.01, 0.015):
+            assert client.put("/api/trading/clients/A/volume", json={"volume": invalid}).status_code == 400
+        assert client.put("/api/trading/clients/C/volume", json={"volume": 0.2}).status_code == 400
         result = client.post("/api/mt5/actions/open_long?client_id=B")
         assert result.status_code == 202
         wait_completed(client.app.state.trading_service.repository, result.json()["signal_id"])
         orders = client.get("/api/trade-orders").json()
         assert len(orders) == 1 and orders[0]["client_id"] == "B" and orders[0]["symbol"] == "XAUUSDm"
+        assert orders[0]["volume"] == 0.3
+        # Update an already running child, then discard it: both paths use the saved value.
+        assert client.put("/api/trading/clients/B/volume", json={"volume": 0.4}).status_code == 200
+        result = client.post("/api/mt5/actions/open_short?client_id=B")
+        wait_completed(client.app.state.trading_service.repository, result.json()["signal_id"])
+        assert client.get("/api/trade-orders").json()[0]["volume"] == 0.4
+        client.app.state.trading_service.workers["B"].gateway.shutdown()
+        result = client.post("/api/mt5/actions/open_long?client_id=B")
+        wait_completed(client.app.state.trading_service.repository, result.json()["signal_id"])
+        assert client.get("/api/trade-orders").json()[0]["volume"] == 0.4
         assert client.post("/api/trading/clients/A/disable").json()["enabled"] is False
         assert client.post("/api/mt5/actions/open_long?client_id=A").status_code == 409
         assert client.post("/api/trading/clients/C/disable").status_code == 400

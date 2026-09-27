@@ -10,12 +10,21 @@ from pathlib import Path
 from typing import Any
 
 from app.errors import TemplateError, ValidationError
+from app.models import AlertSignalSettings
 
 
 PRICE_INPUTS: tuple[tuple[str, str], ...] = tuple(
     (f"in_{4 + index * 3}", f"in_{5 + index * 3}") for index in range(20)
 )
 PRICE_SEPARATOR_PATTERN = re.compile(r"[\s,，、;；]+")
+SIGNAL_INPUTS = {
+    "fractal": ("in_67", "in_68"),
+    "pinbar": ("in_70", "in_71"),
+    "pinbar_more": ("in_75", "in_76"),
+    "insidebar": ("in_80", "in_81"),
+    "engulfing": ("in_83", "in_84"),
+}
+SIGNAL_DISTANCE_INPUTS = {"price_delta": "in_64", "entry_delta": "in_65", "stop_delta": "in_66"}
 DECIMAL_PATTERN = re.compile(r"\d+(?:\.\d+)?\Z")
 REQUIRED_WEBHOOK_PLACEHOLDERS = {
     "side": "{{strategy.order.action}}",
@@ -133,6 +142,7 @@ class AlertTemplateBuilder:
         start_time_ms: int | None = None,
         resolution: str | None = None,
         now_ms: int | None = None,
+        signal_settings: AlertSignalSettings | None = None,
     ) -> dict[str, Any]:
         template = self._load_template()
         payload = template.get("payload")
@@ -142,6 +152,16 @@ class AlertTemplateBuilder:
         inputs = self._find_strategy_inputs(payload)
         self._validate_price_inputs(inputs)
         self._validate_strategy_inputs(inputs)
+        if signal_settings is not None:
+            self._read_signal_settings(inputs)
+            for signal, (key_5, key_2) in SIGNAL_INPUTS.items():
+                setting = getattr(signal_settings, signal)
+                inputs[key_5] = setting.minute_5
+                inputs[key_2] = setting.minute_2
+            for field, key in SIGNAL_DISTANCE_INPUTS.items():
+                value = getattr(signal_settings, field)
+                if value is not None:
+                    inputs[key] = value
 
         settings = self._resolve_strategy_settings(
             payload,
@@ -193,6 +213,37 @@ class AlertTemplateBuilder:
             end_time_ms=start_time_ms + valid_bars * minutes * 60_000,
             resolution=resolution,
         )
+
+    def signal_settings(self) -> AlertSignalSettings:
+        template = self._load_template()
+        payload = template.get("payload")
+        if not isinstance(payload, dict):
+            raise TemplateError("payload.json 缺少 payload 对象")
+        return self._read_signal_settings(self._find_strategy_inputs(payload))
+
+    def signal_settings_from_template(self, template: dict[str, Any]) -> AlertSignalSettings:
+        """Read the actual inputs submitted for this alert, not current defaults."""
+        return self._read_signal_settings(self._find_strategy_inputs(template["payload"]))
+
+    @staticmethod
+    def _read_signal_settings(inputs: dict[str, Any]) -> AlertSignalSettings:
+        invalid = [key for pair in SIGNAL_INPUTS.values() for key in pair if type(inputs.get(key)) is not bool]
+        if invalid:
+            raise TemplateError("模板信号开关缺失或不是布尔值：" + ", ".join(invalid))
+        invalid_distances = [
+            key for key in SIGNAL_DISTANCE_INPUTS.values()
+            if type(inputs.get(key)) not in (int, float)
+            or not math.isfinite(inputs[key]) or inputs[key] < 0
+        ]
+        if invalid_distances:
+            raise TemplateError("模板价格距离缺失或不是非负有限数值：" + ", ".join(invalid_distances))
+        return AlertSignalSettings.model_validate({
+            **{
+                signal: {"minute_5": inputs[key_5], "minute_2": inputs[key_2]}
+                for signal, (key_5, key_2) in SIGNAL_INPUTS.items()
+            },
+            **{field: inputs[key] for field, key in SIGNAL_DISTANCE_INPUTS.items()},
+        })
 
     def webhook_message(self) -> str:
         template = self._load_template()

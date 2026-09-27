@@ -109,6 +109,29 @@ def test_disabled_webhook_is_saved_once_and_never_queued(tmp_path: Path) -> None
     assert row["action"] == TradeAction.OPEN_LONG.value
     assert "not-stored" not in row["payload_json"]
     assert len(repository.list_signals()) == 1
+    assert repository.list_signals()[0].trigger_price == "4600"
+
+
+@pytest.mark.parametrize("source, price, expected", [
+    ("tradingview", "4285.1800", "4285.1800"),
+    ("tradingview", 4285.18, "4285.18"),
+    ("tradingview", None, None),
+    ("tradingview", "", None),
+    ("tradingview", "NaN", None),
+    ("tradingview", "-1", None),
+    ("tradingview", True, None),
+    ("manual", "4285.18", None),
+])
+def test_signal_trigger_price_reads_saved_payload(tmp_path: Path, source, price, expected) -> None:
+    database = tmp_path / "price.db"
+    repository = TradeRepository(database)
+    repository.initialize()
+    repository.insert_fanout(signal_id="signal", source=source, action="open_long", symbol="XAUUSD",
+                            payload={"price": price}, clients=[("A", "XAUUSD", False)])
+    signals = TradeRepository(database).list_signals()
+    assert len(signals) == 1
+    assert signals[0].trigger_price == expected
+    assert "payload_json" not in signals[0].model_dump()
 
 
 def test_webhook_rejects_expired_signal(tmp_path: Path) -> None:

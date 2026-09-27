@@ -102,6 +102,9 @@ class Mt5Gateway:
                 symbol_available=bool(symbol_info),
                 bid=float(tick.bid) if tick else None,
                 ask=float(tick.ask) if tick else None,
+                volume_min=float(symbol_info.volume_min) if symbol_info else None,
+                volume_max=float(symbol_info.volume_max) if symbol_info else None,
+                volume_step=float(symbol_info.volume_step) if symbol_info else None,
                 owned_long_positions=sum(1 for position in positions if position.type == mt5.POSITION_TYPE_BUY),
                 owned_short_positions=sum(1 for position in positions if position.type == mt5.POSITION_TYPE_SELL),
             )
@@ -162,8 +165,8 @@ class Mt5Gateway:
             raise Mt5ExecutionError("当前账户不允许程序交易")
         if self.demo_only and account.trade_mode != mt5.ACCOUNT_TRADE_MODE_DEMO:
             raise Mt5ExecutionError("安全保护：当前只允许模拟账户")
-        if self.volume <= 0 or self.volume > self.max_volume:
-            raise Mt5ExecutionError("下单手数超出程序限制")
+        if not math.isfinite(self.volume) or self.volume <= 0:
+            raise Mt5ExecutionError("下单手数必须是大于 0 的有限数值")
         if not mt5.symbol_select(self.symbol, True):
             raise Mt5ExecutionError(f"无法选择交易品种 {self.symbol}")
         info = mt5.symbol_info(self.symbol)

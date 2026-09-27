@@ -16,6 +16,7 @@ from uuid import uuid4
 from app.errors import Mt5NotReadyError, TradingDisabledError, ValidationError
 from app.models import (
     ManualActionResponse,
+    ClientVolumeRequest,
     Mt5Status,
     TradeAction,
     TradingRuntimeStatus,
@@ -160,7 +161,21 @@ class Mt5Worker:
         self.repository.update_signal_status(signal_id, "running")
         try:
             action = TradeAction(signal["action"])
-            orders = self.gateway.execute(action)
+            # Read immediately before execution so queued webhooks and recovered tasks
+            # use the account's persisted volume, including after a child respawns.
+            saved_volume = self.repository.get_runtime_setting(f"mt5_volume_{self.client_id}")
+            if saved_volume is not None and action in {
+                TradeAction.OPEN_LONG, TradeAction.OPEN_SHORT,
+                TradeAction.REVERSE_TO_LONG, TradeAction.REVERSE_TO_SHORT,
+            }:
+                volume = ClientVolumeRequest(volume=float(saved_volume)).volume
+                if isinstance(self.gateway, Mt5Gateway):
+                    self.gateway.volume = volume
+                    orders = self.gateway.execute(action)
+                else:
+                    orders = self.gateway.execute(action, volume=volume)
+            else:
+                orders = self.gateway.execute(action)
             for order in orders:
                 self.repository.add_order(
                     signal_id=signal_id,
@@ -248,7 +263,6 @@ class TradingService:
             enabled=self.is_enabled(),
             webhook_url=webhook_url or self.webhook_url or "",
             volume=self.volume,
-            max_volume=self.max_volume,
             emergency_sl_distance=self.emergency_sl_distance,
             demo_only=self.demo_only,
             mt5=mt5_status,

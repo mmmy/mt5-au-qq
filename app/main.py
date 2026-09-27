@@ -3,6 +3,7 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Query, Request, status
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -12,7 +13,10 @@ from app.config import Settings
 from app.errors import AppError
 from app.models import (
     AlertItem,
+    AlertSignalSettings,
     ClearSignalsResponse,
+    ClientVolumeRequest,
+    ClientVolumeResponse,
     CreateAlertRequest,
     CreateAlertResponse,
     DeleteAlertResponse,
@@ -93,6 +97,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             content={"detail": {"code": error.code, "message": error.message}},
         )
 
+    @app.exception_handler(RequestValidationError)
+    async def handle_validation_error(_request: Request, error: RequestValidationError) -> JSONResponse:
+        # Invalid floats (NaN/Infinity) cannot be echoed in a JSON error response.
+        details = [
+            {key: item[key] for key in ("type", "loc", "msg")}
+            for item in error.errors()
+        ]
+        return JSONResponse(status_code=422, content={"detail": details})
+
     @app.get("/api/alerts", response_model=list[AlertItem])
     async def list_alerts(request: Request) -> list[AlertItem]:
         return await request.app.state.alert_service.list_alerts()
@@ -109,7 +122,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             valid_hours=data.valid_hours,
             start_time_ms=data.start_time_ms,
             resolution=data.resolution,
+            signal_settings=data.signal_settings,
         )
+
+    @app.get("/api/alerts/signal-settings", response_model=AlertSignalSettings)
+    async def get_signal_settings(request: Request) -> AlertSignalSettings:
+        return request.app.state.alert_service.get_signal_settings()
+
+    @app.put("/api/alerts/signal-settings", response_model=AlertSignalSettings)
+    async def save_signal_settings(data: AlertSignalSettings, request: Request) -> AlertSignalSettings:
+        return request.app.state.alert_service.save_signal_settings(data)
 
     @app.delete("/api/alerts/{alert_id}", response_model=DeleteAlertResponse)
     async def delete_alert(alert_id: int, request: Request) -> DeleteAlertResponse:
@@ -143,13 +165,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         webhook_url = resolve_webhook_url(request, request.app.state.settings.local_webhook_url)
         return await request.app.state.trading_service.runtime_status(webhook_url=webhook_url)
 
-    @app.post("/api/trading/enable", response_model=TradingToggleResponse)
-    async def enable_trading(request: Request) -> TradingToggleResponse:
-        return await request.app.state.trading_service.enable()
-
-    @app.post("/api/trading/disable", response_model=TradingToggleResponse)
-    async def disable_trading(request: Request) -> TradingToggleResponse:
-        return request.app.state.trading_service.disable()
+    @app.put("/api/trading/clients/{client_id}/volume", response_model=ClientVolumeResponse)
+    async def set_client_volume(client_id: str, data: ClientVolumeRequest, request: Request) -> ClientVolumeResponse:
+        return await request.app.state.trading_service.set_client_volume(client_id, data.volume)
 
     @app.post("/api/trading/clients/{client_id}/enable", response_model=TradingToggleResponse)
     async def enable_client(client_id: str, request: Request):

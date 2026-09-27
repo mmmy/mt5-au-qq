@@ -14,7 +14,7 @@
 - SQLite 持久化信号、执行状态和 MT5 订单
 - 每个 MT5 客户端使用独立执行进程，账户内串行执行交易，支持两个客户端接收同一信号
 - 支持通过共用配置限制为模拟账户，使用固定手数和独立 magic number
-- 页面展示 MT5 状态、本机 webhook URL、交易总开关和手动测试按钮，交易开关状态会持久化
+- 页面展示 MT5 状态、本机 webhook URL、各客户端独立交易开关和手动测试按钮，交易开关状态会持久化
 - 显示 MT5 返回的完整账户模式（Demo、Contest/考核、Real 技术模式）及服务器和脱敏账号
 
 ## 安装和运行
@@ -67,14 +67,13 @@ Copy-Item .env.example .env
 | `DATABASE_FILE` | `data/trading.db` | SQLite 数据文件 |
 | `MT5_TERMINAL_PATH` | 自动识别当前终端 | MT5 terminal64.exe 路径 |
 | `MT5_SYMBOL` | `XAUUSD` | MT5 黄金品种名称 |
-| `MT5_VOLUME` | `0.01` | 固定下单手数 |
-| `MT5_MAX_VOLUME` | `0.10` | 程序允许的最大手数 |
+| `MT5_VOLUME` | `0.01` | 各账户尚未保存配置时使用的默认开仓手数 |
 | `MT5_MAGIC` | `26082301` | 本程序仓位标识 |
 | `MT5_DEVIATION` | `20` | 下单允许偏差点数 |
 | `MT5_EMERGENCY_SL_DISTANCE` | `20` | 券商端灾难保护止损价格距离，0 表示关闭 |
 | `MT5_DEMO_ONLY` | `false` | 是否只允许 MT5 技术类型为 Demo 的账户；Prop Firm 模拟资金账户如被标记为 Contest/Real，设为 `true` 后也会被拒绝 |
 | `SIGNAL_MAX_AGE_SECONDS` | `180` | webhook 信号最大有效秒数 |
-| `TRADING_ENABLED_AT_START` | `false` | 数据库尚无已保存开关状态时的首次默认值 |
+| `TRADING_ENABLED_AT_START` | `false` | 各客户端尚无已保存开关状态时的首次默认值 |
 
 ### Windows 双 MT5 客户端配置
 
@@ -87,7 +86,6 @@ MT5_B_TERMINAL_PATH="C:\MT5-B\terminal64.exe"
 # 两个客户端共用以下交易参数。
 MT5_SYMBOL=XAUUSD
 MT5_VOLUME=0.01
-MT5_MAX_VOLUME=0.10
 MT5_MAGIC=26082301
 MT5_DEVIATION=20
 MT5_EMERGENCY_SL_DISTANCE=20
@@ -96,11 +94,15 @@ MT5_DEMO_ONLY=false
 
 示例路径需替换为实际值。账号和服务器使用各终端当前登录的账户，不需要在 `.env` 中填写账号或密码。两个终端应分别登录对应账户。
 
-两个路径均留空时继续使用原来的 `MT5_TERMINAL_PATH`（或自动检测）。仅填写 A 时使用一个明确指定的客户端；填写 B 时必须同时填写 A，且两个路径不能相同。只有程序路径按客户端区分，品种、手数、最大手数、magic、允许偏差、止损距离和模拟账户限制全部共用 `MT5_*` 配置；不读取 `MT5_A_VOLUME`、`MT5_B_SYMBOL` 等客户端专属参数。修改 `.env` 后需要重启服务。
+两个路径均留空时继续使用原来的 `MT5_TERMINAL_PATH`（或自动检测）。仅填写 A 时使用一个明确指定的客户端；填写 B 时必须同时填写 A，且两个路径不能相同。程序路径按客户端区分，品种、默认手数、magic、允许偏差、止损距离和模拟账户限制共用 `MT5_*` 配置；不读取 `MT5_A_VOLUME`、`MT5_B_SYMBOL` 等客户端专属环境变量。修改 `.env` 后需要重启服务。前端单独保存的账户手数优先于 `MT5_VOLUME`。
 
 `MT5_SYMBOL` 同时用于校验 TradingView 信号品种和指定两个终端实际交易的品种，因此两个终端都需要提供相同名称的交易品种。
 
-管理页面显示两个客户端的账户、连接、报价、持仓、手数和独立交易开关。总开关和客户端开关都开启才执行交易；客户端开关默认开启，总开关首次运行默认关闭，两种开关均持久化。总开关至少需要一个已启用的客户端就绪才能开启；另一个客户端未就绪时，其任务独立记录失败。手动操作可选择单个客户端或所有已启用客户端。
+管理页面显示两个客户端的账户、连接、报价、持仓、手数和独立交易开关。每个客户端仅由自己的交易开关控制，互不影响，开关状态独立持久化。首次运行默认停止各客户端，启用时校验对应终端是否就绪。升级旧版时自动将原总开关与客户端开关共同决定的实际启停状态迁移到各客户端，之后不再读取旧总开关。手动操作可选择单个客户端或所有已启用客户端。
+
+在每个客户端的“开仓手数”栏输入数值并点击“保存”，各账户配置独立写入 SQLite，刷新或重启后保留，无需重建 TradingView 警报。执行 Webhook 或手动开仓、反手时读取该账户最新保存的手数，已有持仓不变，平仓仍使用持仓实际手数。手数必须是大于 0 的有限数值，程序不设额外上限，旧 `MT5_MAX_VOLUME` 配置不再限制手数。终端可用时保存会校验品种最小/最大手数和步进，下单时再次校验。
+
+`PUT /api/trading/clients/{client_id}/volume` 接收 `{"volume": 0.02}`，返回保存的手数。`GET /api/trading/status` 的各客户端状态返回当前生效的 `volume`。为兼容旧客户端保留的 `max_volume` 响应字段为 `null`，表示没有程序上限；品种实际限制来自 MT5 状态。
 
 同一条 webhook 只保存一次原始信号，并为各客户端原子创建执行任务。重复 webhook 不会重复下单，订单记录包含 `client_id`，信号列表显示各客户端结果。A 成功、B 失败会显示“部分成功”，不会自动撤销 A 的交易，也不保证两边完全同时成交。
 
@@ -181,8 +183,6 @@ GET    /api/health
 POST   /api/webhooks/tradingview
 GET    /api/tradingview/setup
 GET    /api/trading/status
-POST   /api/trading/enable
-POST   /api/trading/disable
 POST   /api/trading/clients/{client_id}/enable
 POST   /api/trading/clients/{client_id}/disable
 POST   /api/mt5/actions/open_long
@@ -206,7 +206,13 @@ GET    /api/trade-orders
 }
 ```
 
-创建警报时可以选择开仓方向、时间级别和有效时长（小时）。后端会按时间级别向上换算为 K 线数；例如 1 小时配合 4 小时周期会换算为 1 根 K 线，实际有效 4 小时。旧客户端仍可提交 `valid_bars`，但不能与 `valid_hours` 同时提交。开始时间由后端自动对齐当前 K 线。未提供时长或 K 线数时默认有效 24 小时。有效期按自然时间计算，因此包含休市时间。新警报的参数会按 TradingView `alert_id` 保存到 SQLite，并在警报列表中回显。
+前端创建警报固定使用 2 分钟周期，可选择开仓方向和有效时长（小时）。后端会按周期向上换算为 K 线数；例如 24 小时对应 720 根 2 分钟 K 线。API 仍可指定其他支持的周期，旧客户端仍可提交 `valid_bars`，但不能与 `valid_hours` 同时提交。开始时间由后端自动对齐当前 K 线。未提供时长或 K 线数时默认有效 24 小时。有效期按自然时间计算，因此包含休市时间。新警报的参数会按 TradingView `alert_id` 保存到 SQLite，并在警报列表中回显。每条警报同时保存创建时实际提交的信号开关、三个价格距离，以及用户输入的有效时长；列表的“查看参数”可查看该警报的历史配置。修改默认配置、重复提交相同请求或重启服务不会覆盖已有快照。升级前的警报若没有保存信号参数，会标记为未记录，不会用当前默认配置补填。
+
+创建区域的“信号配置”弹窗可分别启用或关闭分型、Pinbar、Pinbar More、Inside Bar、吞没的 5 分钟和 2 分钟信号，主页显示各开关状态。首次从 `payload.json` 读取；保存后写入 SQLite，重启后保留，只影响新创建的警报。取消或按 Esc 放弃未保存修改。
+
+“信号配置”同时支持信号价格区间偏离（`price_delta` / `in_64`）、开仓距离（`entry_delta` / `in_65`）、止损价格距离（`stop_delta` / `in_66`），均支持非负有限小数。主页显示当前数值，首次从模板读取；旧版保存配置中缺少这三项时自动从模板补齐。这里的止损价格距离属于 TradingView 策略参数。
+
+`GET /api/alerts/signal-settings` 读取配置，`PUT /api/alerts/signal-settings` 保存完整配置。配置包含 `fractal`、`pinbar`、`pinbar_more`、`insidebar`、`engulfing`，每项均包含布尔值 `minute_5` 和 `minute_2`，以及上述三项价格距离。旧客户端省略价格距离时保留已有设置。`POST /api/alerts` 可提交可选的 `signal_settings` 快照；省略时使用已保存配置，尚未保存时使用模板配置。
 
 TradingView webhook 根据 `prevMarketPosition` 和 `marketPosition` 判断操作。相同 webhook 会通过信号哈希去重，不会重复下单。当前本机开发阶段按需求暂不校验 `signalToken`，部署到公网前必须增加鉴权。
 
@@ -218,7 +224,7 @@ TradingView webhook 根据 `prevMarketPosition` 和 `marketPosition` 判断操�
 
 “清除记录”只会在页面隐藏已经结束的信号，不会删除去重数据；等待中和执行中的信号不会被清除。
 
-程序只查询和操作 `MT5_MAGIC` 匹配的仓位，不会主动平掉手工仓位或其他 EA 的仓位。停止交易不会自动平掉已经存在的仓位。
+程序只查询和操作 `MT5_MAGIC` 匹配的仓位，不会主动平掉手工仓位或其他 EA 的仓位。停止某个客户端不会自动平掉该客户端已经存在的仓位，也不影响其他客户端。
 
 ## 测试
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from decimal import Decimal
 from pathlib import Path
 from uuid import UUID
@@ -141,6 +142,52 @@ def test_delete_project_alert() -> None:
     assert client.deleted_ids == [[12]]
 
 
+def test_saved_signals_survive_service_restart_and_apply_to_new_alerts(tmp_path: Path) -> None:
+    repository = TradeRepository(tmp_path / "trading.db")
+    repository.initialize()
+    client = FakeTradingViewClient(create_id=55)
+    service = build_service(client, repository)
+    settings = service.get_signal_settings()
+    assert settings == service.template_builder.signal_settings()
+    settings.fractal.minute_5 = False
+    settings.fractal.minute_2 = False
+    settings.pinbar.minute_2 = True
+    settings.price_delta = 2.75
+    settings.entry_delta = 0
+    settings.stop_delta = 4.125
+    service.save_signal_settings(settings)
+    restarted = build_service(client, TradeRepository(tmp_path / "trading.db"))
+    assert restarted.get_signal_settings() == settings
+    asyncio.run(restarted.create_alert("4600", UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")))
+    inputs = client.created_payloads[0]["payload"]["conditions"][0]["series"][0]["inputs"]
+    assert inputs["in_67"] is False
+    assert inputs["in_68"] is False
+    assert inputs["in_71"] is True
+    assert (inputs["in_64"], inputs["in_65"], inputs["in_66"]) == (2.75, 0, 4.125)
+    override = settings.model_copy(deep=True)
+    override.fractal.minute_5 = True
+    asyncio.run(restarted.create_alert(
+        "4600", UUID("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"), signal_settings=override,
+    ))
+    assert client.created_payloads[1]["payload"]["conditions"][0]["series"][0]["inputs"]["in_67"] is True
+    assert restarted.get_signal_settings() == settings
+
+
+def test_old_saved_signal_settings_fill_distances_from_template(tmp_path: Path) -> None:
+    repository = TradeRepository(tmp_path / "trading.db")
+    repository.initialize()
+    service = build_service(FakeTradingViewClient(), repository)
+    defaults = service.template_builder.signal_settings()
+    old = defaults.model_dump(exclude={"price_delta", "entry_delta", "stop_delta"})
+    old["fractal"]["minute_5"] = False
+    repository.set_runtime_setting("alert_signal_settings", json.dumps(old))
+    actual = service.get_signal_settings()
+    assert actual.fractal.minute_5 is False
+    assert (actual.price_delta, actual.entry_delta, actual.stop_delta) == (
+        defaults.price_delta, defaults.entry_delta, defaults.stop_delta,
+    )
+
+
 def test_list_enriches_tradingview_alert_with_saved_strategy_settings(tmp_path: Path) -> None:
     repository = TradeRepository(tmp_path / "trading.db")
     repository.initialize()
@@ -164,3 +211,56 @@ def test_list_enriches_tradingview_alert_with_saved_strategy_settings(tmp_path: 
     assert result[0].valid_bars == 288
     assert result[0].start_time_ms == 1787582700000
     assert result[0].end_time_ms == 1787669100000
+    assert result[0].signal_settings is None
+
+
+def test_alert_snapshot_survives_defaults_change_restart_and_duplicate_request(tmp_path: Path) -> None:
+    repository = TradeRepository(tmp_path / "snapshot.db")
+    repository.initialize()
+    client = FakeTradingViewClient(create_id=55)
+    service = build_service(client, repository)
+    requested = service.get_signal_settings().model_copy(deep=True)
+    requested.fractal.minute_5 = False
+    requested.pinbar.minute_2 = True
+    requested.price_delta = 2.75
+    requested.entry_delta = 0
+    requested.stop_delta = 4.125
+    request_id = UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+    created = asyncio.run(service.create_alert(
+        "4600 4620.5", request_id, side="看空", valid_hours=Decimal("1.01"),
+        resolution="2", signal_settings=requested,
+    ))
+    assert created.alert.signal_settings == requested
+    assert created.alert.valid_hours == "1.01"
+    assert created.alert.valid_bars == 31
+    client.alerts = [{"alert_id": 55, "name": created.alert.name, "active": True,
+                      "symbol": "FX:XAUUSD", "resolution": "2"}]
+    changed = requested.model_copy(deep=True)
+    changed.fractal.minute_5 = True
+    changed.price_delta = 9.5
+    service.save_signal_settings(changed)
+    restarted = build_service(client, TradeRepository(tmp_path / "snapshot.db"))
+    listed = asyncio.run(restarted.list_alerts())[0]
+    assert listed.signal_settings == requested
+    assert listed.valid_hours == "1.01"
+    assert listed.side == "看空" and listed.prices == ["4600", "4620.5"]
+    duplicate = asyncio.run(restarted.create_alert(
+        "4700", request_id, side="看多", valid_hours=Decimal("24"), signal_settings=changed,
+    ))
+    assert duplicate.created is False
+    assert duplicate.alert.signal_settings == requested
+    assert duplicate.alert.valid_hours == "1.01"
+    assert len(client.created_payloads) == 1
+
+
+def test_snapshot_uses_completed_inputs_sent_to_tradingview(tmp_path: Path) -> None:
+    repository = TradeRepository(tmp_path / "completed.db")
+    repository.initialize()
+    service = build_service(FakeTradingViewClient(), repository)
+    defaults = service.get_signal_settings()
+    incomplete = defaults.model_copy(update={"price_delta": None, "entry_delta": None, "stop_delta": None})
+    created = asyncio.run(service.create_alert(
+        "4600", UUID("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"), signal_settings=incomplete,
+    ))
+    assert created.alert.signal_settings == defaults
+    assert repository.get_alert_configs([999])[999]["signal_settings"] == defaults.model_dump(mode="json")

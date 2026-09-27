@@ -7,9 +7,9 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from app.alert_template import AlertTemplateBuilder, decimal_to_string, parse_prices
+from app.alert_template import SIGNAL_DISTANCE_INPUTS, AlertTemplateBuilder, decimal_to_string, parse_prices
 from app.errors import AlertNotFoundError, TemplateError, TradingViewError
-from app.models import AlertItem, CreateAlertResponse, DeleteAlertResponse
+from app.models import AlertItem, AlertSignalSettings, CreateAlertResponse, DeleteAlertResponse
 from app.trade_repository import TradeRepository
 from app.tradingview import TradingViewClient
 
@@ -31,6 +31,30 @@ class AlertService:
         self.repository = repository
         self._mutation_lock = asyncio.Lock()
 
+    def get_signal_settings(self) -> AlertSignalSettings:
+        saved = self.repository.get_runtime_setting("alert_signal_settings") if self.repository else None
+        if saved is not None:
+            settings = AlertSignalSettings.model_validate_json(saved)
+            if any(getattr(settings, field) is None for field in SIGNAL_DISTANCE_INPUTS):
+                return self._complete_signal_settings(settings, self.template_builder.signal_settings())
+            return settings
+        return self.template_builder.signal_settings()
+
+    @staticmethod
+    def _complete_signal_settings(settings: AlertSignalSettings, defaults: AlertSignalSettings) -> AlertSignalSettings:
+        return settings.model_copy(update={
+            field: getattr(defaults, field)
+            for field in SIGNAL_DISTANCE_INPUTS if getattr(settings, field) is None
+        })
+
+    def save_signal_settings(self, settings: AlertSignalSettings) -> AlertSignalSettings:
+        if self.repository is None:
+            raise TemplateError("信号配置存储不可用")
+        self.template_builder.signal_settings()
+        settings = self._complete_signal_settings(settings, self.get_signal_settings())
+        self.repository.set_runtime_setting("alert_signal_settings", settings.model_dump_json())
+        return settings
+
     async def list_alerts(self) -> list[AlertItem]:
         alerts = await self.client.list_alerts()
         project_alerts = [self._to_alert_item(item) for item in alerts if self._is_project_alert(item)]
@@ -51,6 +75,7 @@ class AlertService:
         valid_hours: Decimal | None = None,
         start_time_ms: int | None = None,
         resolution: str = "2",
+        signal_settings: AlertSignalSettings | None = None,
     ) -> CreateAlertResponse:
         prices = parse_prices(raw_prices)
         price_strings = [decimal_to_string(price) for price in prices]
@@ -76,8 +101,14 @@ class AlertService:
                 valid_hours=valid_hours,
                 start_time_ms=start_time_ms,
                 resolution=resolution,
+                signal_settings=(
+                    self._complete_signal_settings(signal_settings, self.get_signal_settings())
+                    if signal_settings is not None else self.get_signal_settings()
+                ),
             )
             settings = self.template_builder.strategy_settings(template)
+            signal_snapshot = self.template_builder.signal_settings_from_template(template)
+            requested_hours = decimal_to_string(valid_hours) if valid_hours is not None else None
             alert_id = await self.client.create_alert(template)
             if alert_id is None:
                 created_alert = await self._find_by_name(name)
@@ -89,6 +120,9 @@ class AlertService:
             created_alert = created_alert.model_copy(
                 update={
                     "prices": price_strings,
+                    "signal_settings": signal_snapshot,
+                    "valid_hours": requested_hours,
+                    "resolution": settings.resolution,
                     "side": settings.side,
                     "valid_bars": settings.valid_bars,
                     "start_time_ms": settings.start_time_ms,
@@ -104,6 +138,8 @@ class AlertService:
                     start_time_ms=settings.start_time_ms,
                     end_time_ms=settings.end_time_ms,
                     resolution=settings.resolution,
+                    signal_settings=signal_snapshot.model_dump(mode="json"),
+                    valid_hours=requested_hours,
                 )
 
             return CreateAlertResponse(created=True, prices=price_strings, alert=created_alert)
@@ -169,6 +205,8 @@ class AlertService:
         return alert.model_copy(
             update={
                 "prices": config.get("prices"),
+                "signal_settings": AlertSignalSettings.model_validate(config["signal_settings"]) if config.get("signal_settings") is not None else None,
+                "valid_hours": config.get("valid_hours"),
                 "side": config.get("side"),
                 "valid_bars": config.get("valid_bars"),
                 "start_time_ms": config.get("start_time_ms"),

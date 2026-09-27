@@ -8,6 +8,7 @@ import pytest
 
 from app.alert_template import AlertTemplateBuilder, default_valid_bars, parse_prices, valid_bars_for_hours
 from app.errors import TemplateError, ValidationError
+from app.models import AlertSignalSettings
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -15,6 +16,71 @@ ROOT = Path(__file__).resolve().parent.parent
 
 def strategy_inputs(document: dict) -> dict:
     return document["payload"]["conditions"][0]["series"][0]["inputs"]
+
+
+def test_signal_settings_replace_only_enable_inputs() -> None:
+    builder = AlertTemplateBuilder(ROOT / "payload.json")
+    source = json.loads((ROOT / "payload.json").read_text(encoding="utf-8-sig"))
+    original = strategy_inputs(source)
+    changes = {
+        "fractal": {"minute_5": False, "minute_2": True},
+        "pinbar": {"minute_5": True, "minute_2": False},
+        "pinbar_more": {"minute_5": False, "minute_2": True},
+        "insidebar": {"minute_5": True, "minute_2": True},
+        "engulfing": {"minute_5": False, "minute_2": False},
+    }
+    result = builder.build(
+        [Decimal("4600")], name="signals-test", now_ms=1787505555000,
+        signal_settings=AlertSignalSettings.model_validate(changes),
+    )
+    inputs = strategy_inputs(result)
+    assert [inputs[f"in_{index}"] for index in (67, 68, 70, 71, 75, 76, 80, 81, 83, 84)] == [
+        False, True, True, False, False, True, True, True, False, False,
+    ]
+    for index in (3, 6, 63, 64, 65, 66, 69, 72, 73, 74, 77, 78, 79, 82, 85, 86, 87, 88, 113):
+        assert inputs[f"in_{index}"] == original[f"in_{index}"]
+    assert json.loads((ROOT / "payload.json").read_text(encoding="utf-8-sig")) == source
+
+
+@pytest.mark.parametrize("value", [None, 1, "true"])
+def test_signal_settings_reject_invalid_template_switch(tmp_path: Path, value: object) -> None:
+    source = json.loads((ROOT / "payload.json").read_text(encoding="utf-8-sig"))
+    strategy_inputs(source)["in_80"] = value
+    path = tmp_path / "payload.json"
+    path.write_text(json.dumps(source), encoding="utf-8")
+    with pytest.raises(TemplateError, match="in_80"):
+        AlertTemplateBuilder(path).signal_settings()
+
+
+def test_signal_price_distances_read_defaults_and_write_correct_indices() -> None:
+    builder = AlertTemplateBuilder(ROOT / "payload.json")
+    source = json.loads((ROOT / "payload.json").read_text(encoding="utf-8-sig"))
+    original = strategy_inputs(source)
+    settings = builder.signal_settings()
+    assert (settings.price_delta, settings.entry_delta, settings.stop_delta) == (
+        original["in_64"], original["in_65"], original["in_66"],
+    )
+    settings.price_delta = 2.75
+    settings.entry_delta = 0
+    settings.stop_delta = 4.125
+    result = builder.build(
+        [Decimal("4600")], name="distances-test", now_ms=1787505555000, signal_settings=settings,
+    )
+    inputs = strategy_inputs(result)
+    assert (inputs["in_64"], inputs["in_65"], inputs["in_66"]) == (2.75, 0, 4.125)
+    assert inputs["in_63"] == original["in_63"]
+    assert inputs["in_67"] == original["in_67"]
+    assert json.loads((ROOT / "payload.json").read_text(encoding="utf-8-sig")) == source
+
+
+@pytest.mark.parametrize("value", [None, -1, True, "2", float("inf"), float("nan")])
+def test_signal_distances_reject_invalid_template_values(tmp_path: Path, value: object) -> None:
+    source = json.loads((ROOT / "payload.json").read_text(encoding="utf-8-sig"))
+    strategy_inputs(source)["in_66"] = value
+    path = tmp_path / "payload.json"
+    path.write_text(json.dumps(source), encoding="utf-8")
+    with pytest.raises(TemplateError, match="in_66"):
+        AlertTemplateBuilder(path).signal_settings()
 
 
 def test_parse_prices_accepts_common_separators_and_normal_decimals() -> None:

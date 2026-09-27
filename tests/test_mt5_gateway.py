@@ -29,3 +29,15 @@ def test_order_filling_prefers_ioc_when_supported() -> None:
 
 def test_order_filling_uses_return_without_flags() -> None:
     assert Mt5Gateway._order_filling(SimpleNamespace(filling_mode=0)) == mt5.ORDER_FILLING_RETURN
+
+
+def test_readiness_accepts_volume_above_old_program_limit(monkeypatch) -> None:
+    gateway = Mt5Gateway(terminal_path=None, symbol="XAUUSD", volume=0.5, max_volume=0.1,
+        magic=100, deviation=20, emergency_sl_distance=20, demo_only=False)
+    monkeypatch.setattr(gateway, "_ensure_initialized", lambda: None)
+    monkeypatch.setattr(mt5, "terminal_info", lambda: SimpleNamespace(connected=True, trade_allowed=True))
+    monkeypatch.setattr(mt5, "account_info", lambda: SimpleNamespace(trade_allowed=True, trade_expert=True))
+    monkeypatch.setattr(mt5, "symbol_select", lambda *args: True)
+    monkeypatch.setattr(mt5, "symbol_info", lambda *args: SimpleNamespace(trade_mode=mt5.SYMBOL_TRADE_MODE_FULL))
+    gateway._validate_trading_ready()
+    assert gateway._normalize_volume(gateway.volume, SimpleNamespace(volume_min=0.01, volume_max=10, volume_step=0.01)) == 0.5
