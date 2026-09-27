@@ -75,6 +75,7 @@ class AlertService:
         valid_hours: Decimal | None = None,
         start_time_ms: int | None = None,
         resolution: str = "2",
+        email: bool = True,
         signal_settings: AlertSignalSettings | None = None,
     ) -> CreateAlertResponse:
         prices = parse_prices(raw_prices)
@@ -101,6 +102,7 @@ class AlertService:
                 valid_hours=valid_hours,
                 start_time_ms=start_time_ms,
                 resolution=resolution,
+                email=email,
                 signal_settings=(
                     self._complete_signal_settings(signal_settings, self.get_signal_settings())
                     if signal_settings is not None else self.get_signal_settings()
@@ -127,6 +129,7 @@ class AlertService:
                     "valid_bars": settings.valid_bars,
                     "start_time_ms": settings.start_time_ms,
                     "end_time_ms": settings.end_time_ms,
+                    "email": email,
                 }
             )
             if self.repository:
@@ -140,6 +143,7 @@ class AlertService:
                     resolution=settings.resolution,
                     signal_settings=signal_snapshot.model_dump(mode="json"),
                     valid_hours=requested_hours,
+                    email=email,
                 )
 
             return CreateAlertResponse(created=True, prices=price_strings, alert=created_alert)
@@ -179,6 +183,7 @@ class AlertService:
             resolution=str(item.get("resolution") or ""),
             create_time=AlertService._optional_string(item.get("create_time")),
             last_fire_time=AlertService._optional_string(item.get("last_fire_time")),
+            email=AlertService._optional_bool(item.get("email")),
         )
 
     @staticmethod
@@ -199,6 +204,10 @@ class AlertService:
         return str(value) if value is not None else None
 
     @staticmethod
+    def _optional_bool(value: Any) -> bool | None:
+        return bool(value) if type(value) in (bool, int) else None
+
+    @staticmethod
     def _enrich_alert(alert: AlertItem, config: dict[str, Any] | None) -> AlertItem:
         if not config:
             return alert
@@ -212,6 +221,7 @@ class AlertService:
                 "start_time_ms": config.get("start_time_ms"),
                 "end_time_ms": config.get("end_time_ms"),
                 "resolution": str(config.get("resolution") or alert.resolution),
+                "email": AlertService._optional_bool(config.get("email")),
             }
         )
 
@@ -231,4 +241,5 @@ class AlertService:
             resolution=str(resolution or ""),
             create_time=datetime.now(timezone.utc).isoformat(),
             last_fire_time=None,
+            email=AlertService._optional_bool(payload.get("email")),
         )

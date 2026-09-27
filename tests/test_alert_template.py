@@ -141,6 +141,16 @@ def test_builder_replaces_prices_switches_name_and_start_time() -> None:
     json.dumps(result)
 
 
+def test_builder_sets_email_notification_explicitly() -> None:
+    builder = AlertTemplateBuilder(ROOT / "payload.json")
+
+    enabled = builder.build([Decimal("4600")], name="email-on", email=True, now_ms=1787505555000)
+    disabled = builder.build([Decimal("4600")], name="email-off", email=False, now_ms=1787505555000)
+
+    assert enabled["payload"]["email"] is True
+    assert disabled["payload"]["email"] is False
+
+
 def test_builder_supports_twenty_prices() -> None:
     builder = AlertTemplateBuilder(ROOT / "payload.json")
     prices = [Decimal(value) for value in range(4600, 4620)]

@@ -142,6 +142,7 @@ class AlertTemplateBuilder:
         start_time_ms: int | None = None,
         resolution: str | None = None,
         now_ms: int | None = None,
+        email: bool | None = None,
         signal_settings: AlertSignalSettings | None = None,
     ) -> dict[str, Any]:
         template = self._load_template()
@@ -181,6 +182,8 @@ class AlertTemplateBuilder:
         payload["name"] = name
         if webhook_url:
             payload["web_hook"] = webhook_url
+        if email is not None:
+            payload["email"] = email
         inputs["in_0"] = settings.side
         inputs["in_1"] = settings.valid_bars
         inputs["in_2"] = settings.start_time_ms

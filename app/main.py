@@ -122,6 +122,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             valid_hours=data.valid_hours,
             start_time_ms=data.start_time_ms,
             resolution=data.resolution,
+            email=data.email,
             signal_settings=data.signal_settings,
         )
 

@@ -36,6 +36,7 @@ class CreateAlertRequest(BaseModel):
     valid_hours: Decimal | None = Field(default=None, gt=0, le=40_000)
     start_time_ms: int | None = Field(default=None, gt=0)
     resolution: Literal["1", "2", "3", "5", "15", "30", "60", "120", "240"] = "2"
+    email: StrictBool = True
     signal_settings: AlertSignalSettings | None = None
     request_id: UUID = Field(default_factory=uuid4)
 
@@ -54,6 +55,7 @@ class AlertItem(BaseModel):
     start_time_ms: int | None = None
     end_time_ms: int | None = None
     valid_hours: str | None = None
+    email: bool | None = None
     signal_settings: AlertSignalSettings | None = None
 
 

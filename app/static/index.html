@@ -259,6 +259,16 @@
               <input id="validHours" name="valid_hours" type="number" min="0.01" max="40000" step="0.01" value="24" required>
             </div>
           </div>
+          <div class="notification-setting">
+            <div>
+              <label for="emailNotification">邮件通知</label>
+              <p id="emailNotificationHelp">警报触发时，由 TradingView 向账号邮箱发送通知。</p>
+            </div>
+            <label class="switch" aria-label="邮件通知">
+              <input id="emailNotification" name="email" type="checkbox" aria-describedby="emailNotificationHelp" checked>
+              <span class="switch-slider" aria-hidden="true"></span>
+            </label>
+          </div>
           <div id="signalSettingsFields"></div>
           <p id="signalSettingsError" class="signal-settings-error" role="alert" hidden></p>
         </div>

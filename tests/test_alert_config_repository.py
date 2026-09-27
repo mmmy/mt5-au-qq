@@ -17,6 +17,7 @@ def test_alert_config_round_trip_and_delete(tmp_path: Path) -> None:
         start_time_ms=1787582700000,
         end_time_ms=1787669100000,
         resolution="5",
+        email=True,
     )
 
     config = repository.get_alert_configs([123])[123]
@@ -24,6 +25,7 @@ def test_alert_config_round_trip_and_delete(tmp_path: Path) -> None:
     assert config["side"] == "看多"
     assert config["valid_bars"] == 288
     assert config["resolution"] == "5"
+    assert config["email"] == 1
 
     repository.delete_alert_config(123)
     assert repository.get_alert_configs([123]) == {}
@@ -43,4 +45,4 @@ def test_old_alert_schema_migrates_without_inventing_snapshot(tmp_path: Path) ->
     repository.initialize()
     record = repository.get_alert_configs([12])[12]
     assert record["prices"] == ["4600"]
-    assert record["signal_settings"] is None and record["valid_hours"] is None
+    assert record["signal_settings"] is None and record["valid_hours"] is None and record["email"] is None

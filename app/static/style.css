@@ -419,6 +419,22 @@ h2 {
 .signal-settings-dialog .form-field label { margin-bottom: 8px; font-size: 14px; font-weight: 650; }
 .alert-config-summary { margin: 0 0 14px; color: var(--text); font-size: 14px; line-height: 1.7; }
 
+.notification-setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin: 0 0 18px;
+  padding: 14px 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.notification-setting > div { min-width: 0; }
+.notification-setting label { display: block; font-size: 14px; font-weight: 650; }
+.notification-setting p { margin: 4px 0 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.notification-setting .switch { display: inline-flex; }
+
 .form-field input,
 .form-field select {
   width: 100%;

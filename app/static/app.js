@@ -5,6 +5,7 @@ const elements = {
   prices: document.querySelector("#prices"),
   alertSide: document.querySelector("#alertSide"),
   validHours: document.querySelector("#validHours"),
+  emailNotification: document.querySelector("#emailNotification"),
   alertEndTime: document.querySelector("#alertEndTime"),
   createButton: document.querySelector("#createButton"),
   refreshButton: document.querySelector("#refreshButton"),
@@ -36,7 +37,7 @@ let savingSignalSettings = false;
 let refreshingDashboard = false;
 let monitoring = false;
 let tradingClients = [];
-let alertFormSettings = { side: "自动", validHours: 24 };
+let alertFormSettings = { side: "自动", validHours: 24, email: true };
 const signalTypes = [
   ["fractal", "分型"],
   ["pinbar", "Pinbar"],
@@ -99,6 +100,7 @@ async function openSignalSettings() {
   if (!signalSettings) return;
   elements.alertSide.value = alertFormSettings.side;
   elements.validHours.value = alertFormSettings.validHours;
+  elements.emailNotification.checked = alertFormSettings.email;
   signalFields.replaceChildren();
   signalError.hidden = true;
   const distances = document.createElement("div");
@@ -148,7 +150,11 @@ async function saveSignalSettings(event) {
     elements.validHours.focus();
     return;
   }
-  const alertDraft = { side: elements.alertSide.value, validHours };
+  const alertDraft = {
+    side: elements.alertSide.value,
+    validHours,
+    email: elements.emailNotification.checked,
+  };
   const draft = Object.fromEntries(signalTypes.map(([key]) => [key, {
     minute_5: signalFields.querySelector(`[name="${key}.minute_5"]`).checked,
     minute_2: signalFields.querySelector(`[name="${key}.minute_2"]`).checked,
@@ -313,7 +319,7 @@ function initializeAlertForm() {
 
 function renderAlertFormSummary() {
   document.getElementById("alertConfigSummary").textContent =
-    `开仓方向：${alertFormSettings.side} · 有效时长：${formatHours(alertFormSettings.validHours)} 小时`;
+    `开仓方向：${alertFormSettings.side} · 有效时长：${formatHours(alertFormSettings.validHours)} 小时 · 邮件通知：${alertFormSettings.email ? "开启" : "关闭"}`;
 }
 
 function updatePriceFeedback() {
@@ -686,6 +692,7 @@ function renderAlertParameters(content, alert, { preview = false } = {}) {
     ["品种", alert.symbol],
     ["价格", alert.prices?.join("、")],
     ["开仓方向", alert.side],
+    ["邮件通知", typeof alert.email === "boolean" ? (alert.email ? "开启" : "关闭") : null],
     ["有效时长", alert.valid_hours ? `${alert.valid_hours} 小时` : effectiveHours ? `${effectiveHours} 小时` : null],
     ["周期", alert.resolution ? `${alert.resolution} 分钟` : null],
     [preview ? "预计开始时间" : "开始时间", alert.start_time_ms ? formatDate(alert.start_time_ms) : null],
@@ -847,6 +854,7 @@ async function createAlert(event) {
   const alertConfig = {
     prices,
     side: alertFormSettings.side,
+    email: alertFormSettings.email,
     valid_hours: validHours,
     resolution: alertResolution,
     signal_settings: JSON.parse(JSON.stringify(signalSettings)),

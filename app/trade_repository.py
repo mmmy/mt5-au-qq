@@ -88,6 +88,8 @@ class TradeRepository:
             for column in ("signal_settings_json", "valid_hours"):
                 if column not in alert_columns:
                     connection.execute(f"ALTER TABLE tv_alert_configs ADD COLUMN {column} TEXT")
+            if "email" not in alert_columns:
+                connection.execute("ALTER TABLE tv_alert_configs ADD COLUMN email INTEGER")
             order_columns = {row["name"] for row in connection.execute("PRAGMA table_info(trade_orders)")}
             if "client_id" not in order_columns:
                 connection.execute("ALTER TABLE trade_orders ADD COLUMN client_id TEXT NOT NULL DEFAULT 'A'")
@@ -310,13 +312,14 @@ class TradeRepository:
         resolution: str,
         signal_settings: dict[str, Any] | None = None,
         valid_hours: str | None = None,
+        email: bool | None = None,
     ) -> None:
         with self._connect() as connection:
             connection.execute(
                 """
                 INSERT INTO tv_alert_configs
-                    (alert_id, prices_json, side, valid_bars, start_time_ms, end_time_ms, resolution, created_at, signal_settings_json, valid_hours)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    (alert_id, prices_json, side, valid_bars, start_time_ms, end_time_ms, resolution, created_at, signal_settings_json, valid_hours, email)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(alert_id) DO UPDATE SET
                     prices_json = excluded.prices_json,
                     side = excluded.side,
@@ -325,7 +328,8 @@ class TradeRepository:
                     end_time_ms = excluded.end_time_ms,
                     resolution = excluded.resolution,
                     signal_settings_json = COALESCE(excluded.signal_settings_json, tv_alert_configs.signal_settings_json),
-                    valid_hours = COALESCE(excluded.valid_hours, tv_alert_configs.valid_hours)
+                    valid_hours = COALESCE(excluded.valid_hours, tv_alert_configs.valid_hours),
+                    email = COALESCE(excluded.email, tv_alert_configs.email)
                 """,
                 (
                     alert_id,
@@ -338,6 +342,7 @@ class TradeRepository:
                     utc_now(),
                     json.dumps(signal_settings, ensure_ascii=False) if signal_settings is not None else None,
                     valid_hours,
+                    int(email) if email is not None else None,
                 ),
             )
 

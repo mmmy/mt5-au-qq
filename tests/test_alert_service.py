@@ -77,6 +77,7 @@ def test_create_builds_payload_and_returns_normalized_prices() -> None:
             "4600.00 4620.5",
             UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
             webhook_url="https://trade.example.com/api/webhooks/tradingview",
+            email=True,
         )
     )
 
@@ -86,6 +87,8 @@ def test_create_builds_payload_and_returns_normalized_prices() -> None:
     assert result.alert.name == PREFIX + "aaaaaaaaaaaa4aaa8aaaaaaaaaaaaaaa"
     assert len(client.created_payloads) == 1
     assert client.created_payloads[0]["payload"]["web_hook"] == "https://trade.example.com/api/webhooks/tradingview"
+    assert client.created_payloads[0]["payload"]["email"] is True
+    assert result.alert.email is True
 
 
 def test_create_converts_valid_hours_and_returns_actual_bars() -> None:
@@ -103,6 +106,8 @@ def test_create_converts_valid_hours_and_returns_actual_bars() -> None:
 
     assert result.alert.valid_bars == 1
     assert result.alert.end_time_ms - result.alert.start_time_ms == 4 * 60 * 60 * 1000
+    assert client.created_payloads[0]["payload"]["email"] is True
+    assert result.alert.email is True
 
 
 def test_create_is_idempotent_for_existing_request_id() -> None:
@@ -228,11 +233,12 @@ def test_alert_snapshot_survives_defaults_change_restart_and_duplicate_request(t
     request_id = UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
     created = asyncio.run(service.create_alert(
         "4600 4620.5", request_id, side="看空", valid_hours=Decimal("1.01"),
-        resolution="2", signal_settings=requested,
+        resolution="2", email=True, signal_settings=requested,
     ))
     assert created.alert.signal_settings == requested
     assert created.alert.valid_hours == "1.01"
     assert created.alert.valid_bars == 31
+    assert created.alert.email is True
     client.alerts = [{"alert_id": 55, "name": created.alert.name, "active": True,
                       "symbol": "FX:XAUUSD", "resolution": "2"}]
     changed = requested.model_copy(deep=True)
@@ -243,6 +249,7 @@ def test_alert_snapshot_survives_defaults_change_restart_and_duplicate_request(t
     listed = asyncio.run(restarted.list_alerts())[0]
     assert listed.signal_settings == requested
     assert listed.valid_hours == "1.01"
+    assert listed.email is True
     assert listed.side == "看空" and listed.prices == ["4600", "4620.5"]
     duplicate = asyncio.run(restarted.create_alert(
         "4700", request_id, side="看多", valid_hours=Decimal("24"), signal_settings=changed,
@@ -250,6 +257,7 @@ def test_alert_snapshot_survives_defaults_change_restart_and_duplicate_request(t
     assert duplicate.created is False
     assert duplicate.alert.signal_settings == requested
     assert duplicate.alert.valid_hours == "1.01"
+    assert duplicate.alert.email is True
     assert len(client.created_payloads) == 1
 
 
