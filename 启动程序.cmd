@@ -36,8 +36,8 @@ if /i "%~1"=="--check" (
     exit /b 0
 )
 
-set "MT5_APP_HOST=127.0.0.1"
-set "MT5_APP_PORT=8000"
+set "MT5_APP_HOST=0.0.0.0"
+set "MT5_APP_PORT=80"
 if not "%~1"=="" set "MT5_APP_HOST=%~1"
 if not "%~2"=="" set "MT5_APP_PORT=%~2"
 echo MT5 AU QQ is starting on %MT5_APP_HOST%:%MT5_APP_PORT%.
