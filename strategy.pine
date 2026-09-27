@@ -493,13 +493,20 @@ barsSinceLastClose() =>
 
 bsLastEntry = barsSinceLastEntry()
 
+// 按基准价格分别记录多空使用情况；提交订单即占用额度，平仓或切换水平不重置。
+// varip 保留实时 K 线内的更新，防止后续 tick 重复提交。
+varip longUsed = map.new<float, bool>()
+varip shortUsed = map.new<float, bool>()
+canLongAtPrice = longPrice > 0 and not longUsed.contains(longPrice)
+canShortAtPrice = shortPrice > 0 and not shortUsed.contains(shortPrice)
+
 varip float longEntryPrice = na
 varip float shortEntryPrice = na
 // 与待开仓价格一起锁定，避免等待期间的新形态覆盖开仓依据。
 varip string longEntryMsg = na
 varip string shortEntryMsg = na
 
-if hasLongPos
+if hasLongPos or not canLongAtPrice
     longEntryPrice := na
     longEntryMsg := na
 else
@@ -513,7 +520,7 @@ else
         longEntryPrice := na
         longEntryMsg := na
 
-if hasShortPos
+if hasShortPos or not canShortAtPrice
     shortEntryPrice := na
     shortEntryMsg := na
 else
@@ -569,15 +576,17 @@ if shortSideOn and hasShortPos
         strategy.close('short', comment = reduceMsg, qty = posSize)
 
 
-if longSideOn and not hasLongPos and entryLong
+if longSideOn and not hasLongPos and entryLong and canLongAtPrice
     strategy.order(id = 'long', qty = posSize, direction = strategy.long, comment = str.format('开仓:{0}', longEntryMsg), alert_message = longEntryMsg, oca_name = 'new', oca_type = strategy.oca.cancel)
+    longUsed.put(longPrice, true)
     longStopPrice := close - stopDelta
     longTargetPrice := shortPriceMin
     // 开仓时同时创建保护性止损订单，由订单生效后的价格触发。
     strategy.exit(id = 'long-stop', from_entry = 'long', stop = longStopPrice, comment = '损', alert_message = stopLossMsg)
 
-if shortSideOn and not hasShortPos and entryShort
+if shortSideOn and not hasShortPos and entryShort and canShortAtPrice
     strategy.order(id = 'short', qty = posSize, direction = strategy.short, comment = str.format('开仓:{0}', shortEntryMsg), alert_message = shortEntryMsg, oca_name = 'new', oca_type = strategy.oca.cancel)
+    shortUsed.put(shortPrice, true)
     shortStopPrice := close + stopDelta
     shortTargetPrice := longPriceMax
     // 开仓时同时创建保护性止损订单，由订单生效后的价格触发。
