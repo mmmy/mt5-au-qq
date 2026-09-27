@@ -11,6 +11,22 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_MT5_TERMINAL = Path(r"D:\Program Files\MetaTrader 5\terminal64.exe")
 
 
+def _terminal_path(raw: str | None) -> Path | None:
+    if raw is None:
+        return None
+    value = raw.strip()
+    # Environment variables can retain the quotes from Windows "Copy as path".
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+        value = value[1:-1]
+    # dotenv decodes escapes in double-quoted values. These control characters
+    # cannot occur in Windows filenames, so restore the original path segments.
+    value = value.translate(str.maketrans({
+        "\a": r"\a", "\b": r"\b", "\f": r"\f", "\n": r"\n",
+        "\r": r"\r", "\t": r"\t", "\v": r"\v",
+    }))
+    return Path(value) if value else None
+
+
 def _env_bool(name: str, default: bool) -> bool:
     raw = os.getenv(name)
     if raw is None:
@@ -66,13 +82,9 @@ class Settings:
     def from_env(cls) -> "Settings":
         # Keep explicitly supplied process/system variables authoritative.
         load_dotenv(PROJECT_ROOT / ".env", override=False)
-        terminal_path_raw = os.getenv("MT5_TERMINAL_PATH")
-        if terminal_path_raw:
-            terminal_path = Path(terminal_path_raw)
-        elif DEFAULT_MT5_TERMINAL.is_file():
+        terminal_path = _terminal_path(os.getenv("MT5_TERMINAL_PATH"))
+        if terminal_path is None and DEFAULT_MT5_TERMINAL.is_file():
             terminal_path = DEFAULT_MT5_TERMINAL
-        else:
-            terminal_path = None
         settings = cls(
             cookie_file=Path(os.getenv("TV_COOKIE_FILE", PROJECT_ROOT / ".tv-cookie")),
             payload_file=Path(os.getenv("TV_PAYLOAD_FILE", PROJECT_ROOT / "payload.json")),
@@ -95,11 +107,11 @@ class Settings:
         )
         clients = []
         for client_id in ("A", "B"):
-            path = os.getenv(f"MT5_{client_id}_TERMINAL_PATH", "").strip()
+            path = _terminal_path(os.getenv(f"MT5_{client_id}_TERMINAL_PATH"))
             if path:
                 clients.append(Mt5ClientConfig(
                     client_id=client_id,
-                    terminal_path=Path(path),
+                    terminal_path=path,
                     symbol=settings.mt5_symbol,
                     volume=settings.mt5_volume,
                     max_volume=settings.mt5_max_volume,

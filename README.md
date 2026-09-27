@@ -80,8 +80,8 @@ Copy-Item .env.example .env
 准备两个安装在不同目录的 MT5 终端，分别登录对应账户并开启算法交易。在项目根目录 `.env` 中填写 **`terminal64.exe` 的完整路径**：
 
 ```dotenv
-MT5_A_TERMINAL_PATH='C:\MT5-A\terminal64.exe'
-MT5_B_TERMINAL_PATH='C:\MT5-B\terminal64.exe'
+MT5_A_TERMINAL_PATH="C:\MT5-A\terminal64.exe"
+MT5_B_TERMINAL_PATH="C:\MT5-B\terminal64.exe"
 
 # 两个客户端共用以下交易参数。
 MT5_SYMBOL=XAUUSD
@@ -94,7 +94,7 @@ MT5_DEMO_ONLY=false
 
 示例路径需替换为实际值。账号和服务器使用各终端当前登录的账户，不需要在 `.env` 中填写账号或密码。两个终端应分别登录对应账户。
 
-Windows 路径请使用单引号（如上），或改用正斜杠 `C:/MT5-A/terminal64.exe`。不要用双引号包裹含单个反斜杠的路径：`.env` 解析会把 `\t` 转成制表符，导致 `\terminal64.exe` 被破坏，并可能报 `-10003 IPC initialize failed, Process create failed`。即使终端已经启动，也无法用被破坏的路径连接。
+支持直接粘贴 Windows“复制文件地址”得到的带双引号路径，也支持单引号、不加引号或正斜杠 `C:/MT5-A/terminal64.exe`。程序会自动恢复 `.env` 双引号解析产生的路径转义（例如 `\terminal64.exe` 中的 `\t`），无需手动更改斜杠或引号。此兼容处理同时适用于 `MT5_TERMINAL_PATH`、`MT5_A_TERMINAL_PATH` 和 `MT5_B_TERMINAL_PATH`。
 
 两个路径均留空时继续使用原来的 `MT5_TERMINAL_PATH`（或自动检测）。仅填写 A 时使用一个明确指定的客户端；填写 B 时必须同时填写 A，且两个路径不能相同。程序路径按客户端区分，品种、默认手数、magic、允许偏差、止损距离和模拟账户限制共用 `MT5_*` 配置；不读取 `MT5_A_VOLUME`、`MT5_B_SYMBOL` 等客户端专属环境变量。修改 `.env` 后需要重启服务。前端单独保存的账户手数优先于 `MT5_VOLUME`。
 

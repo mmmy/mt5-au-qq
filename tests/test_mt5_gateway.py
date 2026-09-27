@@ -1,33 +1,24 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from io import StringIO
 from pathlib import Path
 
 import MetaTrader5 as mt5
 import pytest
-from dotenv import dotenv_values
 
 from app.mt5_gateway import Mt5Gateway, Mt5ExecutionError, account_trade_mode_name
 
 
-@pytest.mark.parametrize("quote", ['"', "'"])
-def test_windows_dotenv_terminal_path(monkeypatch, quote) -> None:
-    path = r"C:\Program Files\Five Percent Online MetaTrader 5\terminal64.exe"
-    parsed = dotenv_values(stream=StringIO(f"MT5_A_TERMINAL_PATH={quote}{path}{quote}"))
-    gateway = Mt5Gateway(terminal_path=Path(parsed["MT5_A_TERMINAL_PATH"]),
+def test_terminal_path_rejects_unrecognized_control_characters(monkeypatch) -> None:
+    gateway = Mt5Gateway(terminal_path=Path("C:/MT5/\x01terminal64.exe"),
         symbol="XAUUSD", volume=0.01, max_volume=0.1, magic=100, deviation=20,
         emergency_sl_distance=20, demo_only=False)
     monkeypatch.setattr(mt5, "shutdown", lambda: None)
     calls = []
     monkeypatch.setattr(mt5, "initialize", lambda actual, **kwargs: calls.append(actual) or True)
-    if quote == '"':
-        with pytest.raises(Mt5ExecutionError, match="单引号"):
-            gateway._ensure_initialized()
-        assert calls == []
-    else:
+    with pytest.raises(Mt5ExecutionError, match="控制字符"):
         gateway._ensure_initialized()
-        assert calls == [path]
+    assert calls == []
 
 
 def test_account_trade_mode_name_maps_mt5_modes() -> None:
