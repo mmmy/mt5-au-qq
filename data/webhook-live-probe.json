@@ -1,0 +1,503 @@
+{
+  "run_id": "tv-smoke-73dc9c5c5c33",
+  "results": [
+    {
+      "case": "open-long",
+      "request": {
+        "name": "AU-BOT",
+        "side": "buy",
+        "exchange": "FX",
+        "period": "2",
+        "marketPosition": "long",
+        "prevMarketPosition": "flat",
+        "symbol": "XAUUSD",
+        "price": "4285.18",
+        "timestamp": "2026-09-27T07:38:09.062162Z",
+        "size": "1",
+        "positionSize": "1",
+        "id": "tv-smoke-73dc9c5c5c33-open-long",
+        "alertMessage": "",
+        "comment": "Demo webhook smoke test tv-smoke-73dc9c5c5c33",
+        "qtyType": "fixed",
+        "signalToken": ""
+      },
+      "http_status": 202,
+      "response": {
+        "accepted": true,
+        "duplicate": false,
+        "signal_id": "63ba78108ced4323fed6e214d625a869954492f7c72cb68b8d82d6eb53b67436",
+        "action": "open_long",
+        "status": "queued"
+      },
+      "execution": {
+        "signal_id": "63ba78108ced4323fed6e214d625a869954492f7c72cb68b8d82d6eb53b67436",
+        "source": "tradingview",
+        "action": "open_long",
+        "status": "failed",
+        "symbol": "XAUUSD",
+        "error": "A: MT5 下单失败：10018 Market closed",
+        "received_at": "2026-09-27T07:38:09.065433+00:00",
+        "executed_at": "2026-09-27T07:38:09.885176+00:00",
+        "executions": [
+          {
+            "client_id": "A",
+            "status": "failed",
+            "symbol": "XAUUSD",
+            "error": "MT5 下单失败：10018 Market closed"
+          }
+        ]
+      }
+    },
+    {
+      "case": "expired-original-replay",
+      "request": {
+        "name": "AU-BOT",
+        "side": "buy",
+        "exchange": "FX",
+        "period": "2",
+        "marketPosition": "long",
+        "prevMarketPosition": "flat",
+        "symbol": "XAUUSD",
+        "price": "4285.18",
+        "timestamp": "2026-09-27T07:38:09.062162Z",
+        "size": "1",
+        "positionSize": "1",
+        "id": "tv-smoke-73dc9c5c5c33-open-long",
+        "alertMessage": "",
+        "comment": "Demo webhook smoke test tv-smoke-73dc9c5c5c33",
+        "qtyType": "fixed",
+        "signalToken": ""
+      },
+      "http_status": 400,
+      "response": {
+        "detail": {
+          "code": "EXPIRED_SIGNAL",
+          "message": "TradingView 信号已经过期"
+        }
+      },
+      "expected_http_status": 400
+    },
+    {
+      "case": "open-short",
+      "request": {
+        "name": "AU-BOT",
+        "side": "sell",
+        "exchange": "FX",
+        "period": "2",
+        "marketPosition": "short",
+        "prevMarketPosition": "flat",
+        "symbol": "XAUUSD",
+        "price": "4285.18",
+        "timestamp": "2026-09-27T07:42:51.522283Z",
+        "size": "1",
+        "positionSize": "-1",
+        "id": "tv-smoke-cb3877e6197d463da62fa90a5de0a6c3",
+        "alertMessage": "",
+        "comment": "Demo webhook smoke test tv-smoke-73dc9c5c5c33",
+        "qtyType": "fixed",
+        "signalToken": ""
+      },
+      "http_status": 202,
+      "expected_http_status": 202,
+      "response": {
+        "accepted": true,
+        "duplicate": false,
+        "signal_id": "6e6e49730d271c74ef6dc4a5af0a91380168017cfea3da43d4d66cbff4a56256",
+        "action": "open_short",
+        "status": "queued"
+      },
+      "execution": {
+        "signal_id": "6e6e49730d271c74ef6dc4a5af0a91380168017cfea3da43d4d66cbff4a56256",
+        "source": "tradingview",
+        "action": "open_short",
+        "status": "failed",
+        "symbol": "XAUUSD",
+        "error": "A: MT5 下单失败：10018 Market closed",
+        "received_at": "2026-09-27T07:42:51.524183+00:00",
+        "executed_at": "2026-09-27T07:42:52.010644+00:00",
+        "executions": [
+          {
+            "client_id": "A",
+            "status": "failed",
+            "symbol": "XAUUSD",
+            "error": "MT5 下单失败：10018 Market closed"
+          }
+        ]
+      }
+    },
+    {
+      "case": "duplicate-open-short",
+      "request": {
+        "name": "AU-BOT",
+        "side": "sell",
+        "exchange": "FX",
+        "period": "2",
+        "marketPosition": "short",
+        "prevMarketPosition": "flat",
+        "symbol": "XAUUSD",
+        "price": "4285.18",
+        "timestamp": "2026-09-27T07:42:51.522283Z",
+        "size": "1",
+        "positionSize": "-1",
+        "id": "tv-smoke-cb3877e6197d463da62fa90a5de0a6c3",
+        "alertMessage": "",
+        "comment": "Demo webhook smoke test tv-smoke-73dc9c5c5c33",
+        "qtyType": "fixed",
+        "signalToken": ""
+      },
+      "http_status": 202,
+      "expected_http_status": 202,
+      "response": {
+        "accepted": false,
+        "duplicate": true,
+        "signal_id": "6e6e49730d271c74ef6dc4a5af0a91380168017cfea3da43d4d66cbff4a56256",
+        "action": "open_short",
+        "status": "failed"
+      },
+      "execution": {
+        "signal_id": "6e6e49730d271c74ef6dc4a5af0a91380168017cfea3da43d4d66cbff4a56256",
+        "source": "tradingview",
+        "action": "open_short",
+        "status": "failed",
+        "symbol": "XAUUSD",
+        "error": "A: MT5 下单失败：10018 Market closed",
+        "received_at": "2026-09-27T07:42:51.524183+00:00",
+        "executed_at": "2026-09-27T07:42:52.010644+00:00",
+        "executions": [
+          {
+            "client_id": "A",
+            "status": "failed",
+            "symbol": "XAUUSD",
+            "error": "MT5 下单失败：10018 Market closed"
+          }
+        ]
+      }
+    },
+    {
+      "case": "close-long-stop",
+      "request": {
+        "name": "AU-BOT",
+        "side": "sell",
+        "exchange": "FX",
+        "period": "2",
+        "marketPosition": "flat",
+        "prevMarketPosition": "long",
+        "symbol": "XAUUSD",
+        "price": "4285.18",
+        "timestamp": "2026-09-27T07:42:52.067740Z",
+        "size": "1",
+        "positionSize": "0",
+        "id": "tv-smoke-64239aedf2784251ad53b36b3484266f",
+        "alertMessage": "__STOPLOSS",
+        "comment": "损",
+        "qtyType": "fixed",
+        "signalToken": ""
+      },
+      "http_status": 202,
+      "expected_http_status": 202,
+      "response": {
+        "accepted": true,
+        "duplicate": false,
+        "signal_id": "99bc862ad5f92fa0fbdfb2cd456fbfa5a71ad4d2572c46aefee108184b9e0c48",
+        "action": "close_long",
+        "status": "queued"
+      },
+      "execution": {
+        "signal_id": "99bc862ad5f92fa0fbdfb2cd456fbfa5a71ad4d2572c46aefee108184b9e0c48",
+        "source": "tradingview",
+        "action": "close_long",
+        "status": "success",
+        "symbol": "XAUUSD",
+        "error": null,
+        "received_at": "2026-09-27T07:42:52.069872+00:00",
+        "executed_at": "2026-09-27T07:42:52.084774+00:00",
+        "executions": [
+          {
+            "client_id": "A",
+            "status": "success",
+            "symbol": "XAUUSD",
+            "error": null
+          }
+        ]
+      }
+    },
+    {
+      "case": "close-short-stop",
+      "request": {
+        "name": "AU-BOT",
+        "side": "buy",
+        "exchange": "FX",
+        "period": "2",
+        "marketPosition": "flat",
+        "prevMarketPosition": "short",
+        "symbol": "XAUUSD",
+        "price": "4285.18",
+        "timestamp": "2026-09-27T07:42:52.201518Z",
+        "size": "1",
+        "positionSize": "0",
+        "id": "tv-smoke-ac0ee93ef8194edc990c7477b5d4e0b7",
+        "alertMessage": "__STOPLOSS",
+        "comment": "损",
+        "qtyType": "fixed",
+        "signalToken": ""
+      },
+      "http_status": 202,
+      "expected_http_status": 202,
+      "response": {
+        "accepted": true,
+        "duplicate": false,
+        "signal_id": "7b609715bc73367aadbcda0f2a876b786f4fe4d242117f0754ed3e5da03acdc5",
+        "action": "close_short",
+        "status": "queued"
+      },
+      "execution": {
+        "signal_id": "7b609715bc73367aadbcda0f2a876b786f4fe4d242117f0754ed3e5da03acdc5",
+        "source": "tradingview",
+        "action": "close_short",
+        "status": "success",
+        "symbol": "XAUUSD",
+        "error": null,
+        "received_at": "2026-09-27T07:42:52.203644+00:00",
+        "executed_at": "2026-09-27T07:42:52.218091+00:00",
+        "executions": [
+          {
+            "client_id": "A",
+            "status": "success",
+            "symbol": "XAUUSD",
+            "error": null
+          }
+        ]
+      }
+    },
+    {
+      "case": "unsupported-strategy",
+      "request": {
+        "name": "OTHER",
+        "side": "buy",
+        "exchange": "FX",
+        "period": "2",
+        "marketPosition": "long",
+        "prevMarketPosition": "flat",
+        "symbol": "XAUUSD",
+        "price": "4285.18",
+        "timestamp": "2026-09-27T07:42:52.233272Z",
+        "size": "1",
+        "positionSize": "1",
+        "id": "tv-smoke-877fc41a06104ac0b382c55f309bae6a",
+        "alertMessage": "",
+        "comment": "Demo webhook smoke test tv-smoke-73dc9c5c5c33",
+        "qtyType": "fixed",
+        "signalToken": ""
+      },
+      "http_status": 400,
+      "expected_http_status": 400,
+      "response": {
+        "detail": {
+          "code": "UNSUPPORTED_STRATEGY",
+          "message": "不是受支持的 TradingView 策略"
+        }
+      }
+    },
+    {
+      "case": "unsupported-symbol",
+      "request": {
+        "name": "AU-BOT",
+        "side": "buy",
+        "exchange": "FX",
+        "period": "2",
+        "marketPosition": "long",
+        "prevMarketPosition": "flat",
+        "symbol": "EURUSD",
+        "price": "4285.18",
+        "timestamp": "2026-09-27T07:42:52.247838Z",
+        "size": "1",
+        "positionSize": "1",
+        "id": "tv-smoke-d4aeef706c7948cca38fbe15c5f681d4",
+        "alertMessage": "",
+        "comment": "Demo webhook smoke test tv-smoke-73dc9c5c5c33",
+        "qtyType": "fixed",
+        "signalToken": ""
+      },
+      "http_status": 400,
+      "expected_http_status": 400,
+      "response": {
+        "detail": {
+          "code": "UNSUPPORTED_SYMBOL",
+          "message": "不支持的交易品种：EURUSD"
+        }
+      }
+    },
+    {
+      "case": "expired-signal",
+      "request": {
+        "name": "AU-BOT",
+        "side": "buy",
+        "exchange": "FX",
+        "period": "2",
+        "marketPosition": "long",
+        "prevMarketPosition": "flat",
+        "symbol": "XAUUSD",
+        "price": "4285.18",
+        "timestamp": "2026-09-27T06:42:52.233218+00:00",
+        "size": "1",
+        "positionSize": "1",
+        "id": "tv-smoke-590c981cde1b4df6a8789f8c836c9d18",
+        "alertMessage": "",
+        "comment": "Demo webhook smoke test tv-smoke-73dc9c5c5c33",
+        "qtyType": "fixed",
+        "signalToken": ""
+      },
+      "http_status": 400,
+      "expected_http_status": 400,
+      "response": {
+        "detail": {
+          "code": "EXPIRED_SIGNAL",
+          "message": "TradingView 信号已经过期"
+        }
+      }
+    },
+    {
+      "case": "future-signal",
+      "request": {
+        "name": "AU-BOT",
+        "side": "buy",
+        "exchange": "FX",
+        "period": "2",
+        "marketPosition": "long",
+        "prevMarketPosition": "flat",
+        "symbol": "XAUUSD",
+        "price": "4285.18",
+        "timestamp": "2026-09-27T08:42:52.233239+00:00",
+        "size": "1",
+        "positionSize": "1",
+        "id": "tv-smoke-b238fd9a66564c39a9698df6d30ca3b6",
+        "alertMessage": "",
+        "comment": "Demo webhook smoke test tv-smoke-73dc9c5c5c33",
+        "qtyType": "fixed",
+        "signalToken": ""
+      },
+      "http_status": 400,
+      "expected_http_status": 400,
+      "response": {
+        "detail": {
+          "code": "INVALID_SIGNAL_TIMESTAMP",
+          "message": "TradingView 信号时间来自未来"
+        }
+      }
+    },
+    {
+      "case": "invalid-timestamp",
+      "request": {
+        "name": "AU-BOT",
+        "side": "buy",
+        "exchange": "FX",
+        "period": "2",
+        "marketPosition": "long",
+        "prevMarketPosition": "flat",
+        "symbol": "XAUUSD",
+        "price": "4285.18",
+        "timestamp": "{{timenow}}",
+        "size": "1",
+        "positionSize": "1",
+        "id": "tv-smoke-f5067148bc174ba8a6b082176efe28b4",
+        "alertMessage": "",
+        "comment": "Demo webhook smoke test tv-smoke-73dc9c5c5c33",
+        "qtyType": "fixed",
+        "signalToken": ""
+      },
+      "http_status": 400,
+      "expected_http_status": 400,
+      "response": {
+        "detail": {
+          "code": "INVALID_SIGNAL_TIMESTAMP",
+          "message": "TradingView timestamp 格式不正确"
+        }
+      }
+    },
+    {
+      "case": "unchanged-position",
+      "request": {
+        "name": "AU-BOT",
+        "side": "buy",
+        "exchange": "FX",
+        "period": "2",
+        "marketPosition": "flat",
+        "prevMarketPosition": "flat",
+        "symbol": "XAUUSD",
+        "price": "4285.18",
+        "timestamp": "2026-09-27T07:42:52.267324Z",
+        "size": "1",
+        "positionSize": "1",
+        "id": "tv-smoke-7528ea41b21545fe8f392555bd357198",
+        "alertMessage": "",
+        "comment": "Demo webhook smoke test tv-smoke-73dc9c5c5c33",
+        "qtyType": "fixed",
+        "signalToken": ""
+      },
+      "http_status": 400,
+      "expected_http_status": 400,
+      "response": {
+        "detail": {
+          "code": "UNSUPPORTED_POSITION_TRANSITION",
+          "message": "不支持的仓位变化：flat → flat"
+        }
+      }
+    },
+    {
+      "case": "missing-name",
+      "request": {
+        "name": null,
+        "side": "buy",
+        "exchange": "FX",
+        "period": "2",
+        "marketPosition": "long",
+        "prevMarketPosition": "flat",
+        "symbol": "XAUUSD",
+        "price": "4285.18",
+        "timestamp": "2026-09-27T07:42:52.269192Z",
+        "size": "1",
+        "positionSize": "1",
+        "id": "tv-smoke-9d338d1c89344771acc45ead13e135b3",
+        "alertMessage": "",
+        "comment": "Demo webhook smoke test tv-smoke-73dc9c5c5c33",
+        "qtyType": "fixed",
+        "signalToken": ""
+      },
+      "http_status": 422,
+      "expected_http_status": 422,
+      "response": {
+        "detail": [
+          {
+            "type": "string_type",
+            "loc": [
+              "body",
+              "name"
+            ],
+            "msg": "Input should be a valid string"
+          }
+        ]
+      }
+    },
+    {
+      "case": "malformed-json",
+      "request": "{invalid json",
+      "http_status": 422,
+      "expected_http_status": 422,
+      "response": {
+        "detail": [
+          {
+            "type": "json_invalid",
+            "loc": [
+              "body",
+              1
+            ],
+            "msg": "JSON decode error"
+          }
+        ]
+      }
+    }
+  ],
+  "remaining_program_positions_clients": [],
+  "live_limit": "MT5 returned 10018 Market closed; actual fills, live reversal, and live stop-loss cannot be verified.",
+  "live_trigger_price_field_available": false
+}

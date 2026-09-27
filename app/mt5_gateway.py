@@ -144,6 +144,11 @@ class Mt5Gateway:
             return
         self.shutdown()
         if self.terminal_path:
+            if any(ord(char) < 32 for char in str(self.terminal_path)):
+                raise Mt5ExecutionError(
+                    "MT5 路径包含制表符或换行等控制字符，可能由 .env 双引号转义造成；"
+                    "请用单引号包裹 terminal64.exe 完整路径，或将反斜杠改成 /，然后重启服务"
+                )
             initialized = mt5.initialize(str(self.terminal_path), timeout=5000)
         else:
             initialized = mt5.initialize(timeout=5000)
