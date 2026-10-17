@@ -2,12 +2,16 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from datetime import datetime, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from app.models import OrderItem, SignalItem
+
+
+TRADING_TIMEZONE = ZoneInfo("Asia/Shanghai")
 
 
 def utc_now() -> str:
@@ -308,6 +312,96 @@ class TradeRepository:
                 (safe_limit,),
             ).fetchall()
         return [OrderItem(**self._row_to_dict(row)) for row in rows]
+
+    def trade_statistics(self, start_date: str, end_date: str, account: str | None = None) -> dict[str, Any]:
+        """Return successful close-signal statistics for inclusive local dates."""
+        first_day = date.fromisoformat(start_date)
+        last_day = date.fromisoformat(end_date)
+        start = datetime.combine(first_day, time.min, tzinfo=TRADING_TIMEZONE).astimezone(timezone.utc)
+        end = datetime.combine(last_day + timedelta(days=1), time.min, tzinfo=TRADING_TIMEZONE).astimezone(timezone.utc)
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                WITH closes AS (
+                    SELECT parent.signal_id, parent.action, parent.payload_json,
+                           parent.received_at,
+                           COALESCE(MIN(CASE WHEN child.status = 'success'
+                               AND (? IS NULL OR child.client_id = ?) THEN child.executed_at END),
+                               parent.executed_at, parent.received_at) AS executed_at,
+                           COUNT(child.signal_id) AS child_count,
+                           GROUP_CONCAT(CASE WHEN child.status = 'success' THEN child.client_id END) AS successful_clients
+                    FROM trade_signals AS parent
+                    LEFT JOIN trade_signals AS child ON child.parent_signal_id = parent.signal_id
+                    WHERE parent.parent_signal_id IS NULL
+                      AND parent.action IN ('close_long', 'close_short')
+                      AND (parent.status IN ('success', 'partial') OR child.status = 'success')
+                    GROUP BY parent.signal_id
+                )
+                SELECT * FROM closes
+                WHERE julianday(executed_at) >= julianday(?) AND julianday(executed_at) < julianday(?)
+                ORDER BY julianday(executed_at) DESC
+                """,
+                (account, account, start.isoformat(), end.isoformat()),
+            ).fetchall()
+            items: list[dict[str, Any]] = []
+            for row in rows:
+                try:
+                    payload = json.loads(row["payload_json"] or "{}")
+                except (TypeError, ValueError):
+                    payload = {}
+                stop = isinstance(payload, dict) and payload.get("alertMessage") == "__STOPLOSS"
+                try:
+                    timestamp = datetime.fromisoformat(row["executed_at"] or row["received_at"])
+                    if timestamp.tzinfo is None:
+                        timestamp = timestamp.replace(tzinfo=timezone.utc)
+                    day = timestamp.astimezone(TRADING_TIMEZONE).date().isoformat()
+                except (TypeError, ValueError):
+                    continue
+                clients = sorted(set((row["successful_clients"] or "").split(",")) - {""})
+                if not row["child_count"]:
+                    clients = ["A"]  # Single-terminal records created before fanout migration.
+                if row["child_count"] and not clients:
+                    continue
+                if account and account not in clients:
+                    continue
+                items.append({"signal_id": row["signal_id"], "day": day, "reason": "止损" if stop else "止盈", "clients": clients})
+        days: list[str] = []
+        cursor = first_day
+        while cursor <= last_day:
+            days.append(cursor.isoformat())
+            cursor += timedelta(days=1)
+        daily = [{"date": day, "take_profit": sum(item["day"] == day and item["reason"] == "止盈" for item in items),
+                  "stop_loss": sum(item["day"] == day and item["reason"] == "止损" for item in items), "net_profit": None} for day in days]
+        return {
+            "start_date": start_date, "end_date": end_date, "account": account,
+            "net_profit": None, "profit_currency": None, "profit_available": False,
+            "profit_status": "unavailable", "profit_by_currency": [],
+            "take_profit_count": sum(item["reason"] == "止盈" for item in items),
+            "stop_loss_count": sum(item["reason"] == "止损" for item in items),
+            "total_signal_count": len(items), "daily": daily,
+            "recent": items[:5], "recent_deals": [],
+        }
+
+    def close_order_reasons(self) -> dict[tuple[str, int], str]:
+        """Match MT5 deal.order to the originating local close order, never by time/profit."""
+        with self._connect() as connection:
+            rows = connection.execute("""
+                SELECT orders.client_id, orders.ticket, COALESCE(parent.payload_json, signals.payload_json) AS payload_json
+                FROM trade_orders AS orders
+                JOIN trade_signals AS signals ON signals.signal_id = orders.signal_id
+                LEFT JOIN trade_signals AS parent ON parent.signal_id = signals.parent_signal_id
+                WHERE orders.action IN ('close', 'close_long', 'close_short') AND orders.ticket IS NOT NULL
+            """).fetchall()
+        result = {}
+        for row in rows:
+            try:
+                payload = json.loads(row["payload_json"] or "{}")
+            except (ValueError, TypeError):
+                payload = {}
+            result[(row["client_id"], int(row["ticket"]))] = (
+                "止损" if isinstance(payload, dict) and payload.get("alertMessage") == "__STOPLOSS" else "止盈"
+            )
+        return result
 
     def upsert_alert_config(
         self,

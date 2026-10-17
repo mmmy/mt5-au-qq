@@ -4,6 +4,7 @@ import asyncio
 import os
 import time
 from dataclasses import replace
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -39,6 +40,9 @@ class SimulatedGateway:
             time.sleep(0.3)
         self.count += 1
         return [ExecutedOrder(action.value, self.count, self.symbol, self.volume, 4600, 10009, "simulated")]
+
+    def history_deals(self, start, end):
+        return {"currency": "AUD", "deals": []}
 
     def shutdown(self):
         pass
@@ -80,6 +84,8 @@ def test_windows_spawn_isolates_connections():
         a.execute(TradeAction.OPEN_LONG)
         assert a.status().owned_long_positions == 1
         assert b.status().owned_long_positions == 0
+        history = a.history_deals(datetime.now(timezone.utc), datetime.now(timezone.utc))
+        assert history == {"currency": "AUD", "deals": []}
     finally:
         a.shutdown()
         b.shutdown()

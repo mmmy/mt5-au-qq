@@ -144,6 +144,26 @@ class OrderItem(BaseModel):
     client_id: str = "A"
 
 
+class TradeStatistics(BaseModel):
+    start_date: str
+    end_date: str
+    net_profit: float | None = None
+    profit_currency: str | None = None
+    profit_available: bool = False
+    history_available: bool = False
+    profit_status: str = "unavailable"
+    profit_by_currency: list[dict[str, Any]] = Field(default_factory=list)
+    profit_currency_missing_clients: list[str] = Field(default_factory=list)
+    take_profit_count: int = 0
+    stop_loss_count: int = 0
+    total_signal_count: int = 0
+    daily: list[dict[str, Any]] = Field(default_factory=list)
+    recent: list[dict[str, Any]] = Field(default_factory=list)
+    recent_deals: list[dict[str, Any]] = Field(default_factory=list)
+    closed_deal_count: int = 0
+    account: str | None = None
+
+
 class Mt5Status(BaseModel):
     initialized: bool
     connected: bool

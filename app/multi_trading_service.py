@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import math
-from datetime import datetime, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from uuid import uuid4
 
 from app.config import Settings
@@ -10,6 +10,7 @@ from app.errors import Mt5NotReadyError, TradingDisabledError, ValidationError
 from app.models import (ClientRuntimeStatus, ClientVolumeRequest, ClientVolumeResponse, ManualActionResponse, Mt5Status, TradeAction,
                         TradingRuntimeStatus, TradingToggleResponse, WebhookResponse)
 from app.mt5_process import ProcessMt5Gateway
+from app.trade_repository import TRADING_TIMEZONE
 from app.trading_service import (MANUAL_ACTIONS, TRADING_ENABLED_SETTING, Mt5Worker,
                                  TradingService, derive_trade_action, webhook_signal_id)
 
@@ -78,6 +79,107 @@ class MultiTradingService(TradingService):
         return TradingRuntimeStatus(enabled=self.is_enabled(), webhook_url=webhook_url or self.webhook_url or "",
             volume=clients[0].volume, emergency_sl_distance=self.emergency_sl_distance,
             demo_only=self.demo_only, mt5=statuses[0], clients=clients)
+
+    async def trade_statistics(self, start_date: str, end_date: str, account: str | None = None):
+        """Combine local signal classification with realized MT5 deal history."""
+        statistics = self.repository.trade_statistics(start_date, end_date, account)
+        start = datetime.combine(date.fromisoformat(start_date), time.min, tzinfo=TRADING_TIMEZONE)
+        end = datetime.combine(date.fromisoformat(end_date) + timedelta(days=1), time.min, tzinfo=TRADING_TIMEZONE)
+        targets = [key for key in self.workers if account is None or key == account]
+        histories = await asyncio.gather(
+            *(asyncio.to_thread(self.workers[key].get_history, start, end) for key in targets),
+            return_exceptions=True,
+        )
+        history_available = bool(targets) and all(
+            not isinstance(result, Exception)
+            and isinstance(result, dict)
+            and isinstance(result.get("deals"), list)
+            for result in histories
+        )
+        deals: list[dict] = []
+        order_reasons = self.repository.close_order_reasons()
+        currencies: set[str] = set()
+        currency_clients: dict[str, set[str]] = {}
+        missing_currency_clients: list[str] = []
+        for client_id, result in zip(targets, histories):
+            if isinstance(result, Exception) or not isinstance(result, dict):
+                continue
+            currency = str(result.get("currency") or "").strip()
+            if currency:
+                currencies.add(currency)
+                currency_clients.setdefault(currency, set()).add(client_id)
+            else:
+                missing_currency_clients.append(client_id)
+            for deal in result.get("deals", []):
+                item = dict(deal)
+                try:
+                    executed = datetime.fromisoformat(str(item.get("time")))
+                    if executed.tzinfo is None:
+                        executed = executed.replace(tzinfo=timezone.utc)
+                except (TypeError, ValueError):
+                    continue
+                if not start <= executed < end:
+                    continue
+                item["client_id"] = client_id
+                item["currency"] = currency or None
+                item["time"] = executed.astimezone(timezone.utc).isoformat()
+                if item.get("exit_reason") != "止损":
+                    item["exit_reason"] = order_reasons.get((client_id, int(item.get("order", 0) or 0)), "止盈")
+                deals.append(item)
+        seen_tickets: set[tuple[str, int]] = set()
+        unique_deals = []
+        for deal in deals:
+            key = (str(deal.get("client_id", "")), int(deal.get("ticket", 0) or 0))
+            if key[1] > 0:
+                if key in seen_tickets:
+                    continue
+                seen_tickets.add(key)
+            unique_deals.append(deal)
+        statistics["history_available"] = history_available
+        statistics["profit_available"] = False
+        statistics["profit_status"] = "unavailable" if not history_available else "currency_unavailable"
+        statistics["profit_currency_missing_clients"] = missing_currency_clients
+        by_currency: dict[str, float] = {}
+        daily_profit: dict[str, dict[str, float]] = {item["date"]: {} for item in statistics["daily"]}
+        if history_available:
+            statistics["closed_deal_count"] = len(unique_deals)
+            for currency in currencies:
+                by_currency[currency] = 0.0
+            for deal in unique_deals:
+                currency = str(deal.get("currency") or "")
+                if not currency:
+                    continue
+                profit = float(deal.get("profit", 0) or 0)
+                by_currency[currency] = by_currency.get(currency, 0.0) + profit
+                try:
+                    timestamp = datetime.fromisoformat(str(deal.get("time")))
+                    if timestamp.tzinfo is None:
+                        timestamp = timestamp.replace(tzinfo=TRADING_TIMEZONE)
+                    day = timestamp.astimezone(TRADING_TIMEZONE).date().isoformat()
+                except (TypeError, ValueError):
+                    continue
+                if day in daily_profit:
+                    daily_profit[day][currency] = daily_profit[day].get(currency, 0.0) + profit
+            statistics["profit_by_currency"] = [
+                {"currency": currency, "net_profit": round(amount, 2),
+                 "client_ids": sorted(currency_clients.get(currency, set()))}
+                for currency, amount in sorted(by_currency.items())
+            ]
+            if not missing_currency_clients and len(currencies) == 1:
+                currency = next(iter(currencies))
+                statistics["profit_currency"] = currency
+                statistics["net_profit"] = round(by_currency.get(currency, 0.0), 2)
+                statistics["profit_available"] = True
+                statistics["profit_status"] = "available"
+            elif missing_currency_clients:
+                statistics["profit_status"] = "currency_unavailable"
+            elif len(currencies) > 1:
+                statistics["profit_status"] = "multiple_currencies"
+            for item in statistics["daily"]:
+                profits = daily_profit[item["date"]]
+                item["net_profit"] = round(profits.get(next(iter(currencies)), 0.0), 2) if statistics["profit_available"] else None
+            statistics["recent_deals"] = sorted(unique_deals, key=lambda row: row.get("time") or "", reverse=True)[:5]
+        return statistics
 
     def client_volume(self, key):
         saved = self.repository.get_runtime_setting(f"mt5_volume_{key}")

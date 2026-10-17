@@ -26,6 +26,7 @@
         <a href="#tradingTitle">交易控制</a>
         <a href="#createTitle">创建警报</a>
         <a href="#listTitle">当前警报</a>
+        <a href="#statisticsTitle">交易统计</a>
         <a href="#signalTitle">信号记录</a>
       </nav>
       <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
@@ -158,6 +159,40 @@
         </div>
       </section>
 
+      <section class="panel statistics-panel" aria-labelledby="statisticsTitle">
+        <div class="panel-heading list-heading">
+          <div><h2 id="statisticsTitle">交易统计</h2></div>
+          <div class="statistics-filters">
+            <label>开始日期 <input id="statisticsStart" type="date"></label>
+            <label>结束日期 <input id="statisticsEnd" type="date"></label>
+            <label>客户端 <select id="statisticsAccount"><option value="">全部客户端</option></select></label>
+            <button class="button button-secondary statistics-preset" data-days="7" type="button">近 7 天</button>
+            <button class="button button-secondary statistics-preset" data-days="30" type="button">近 30 天</button>
+            <button id="statisticsApply" class="button button-primary" type="button">应用</button>
+          </div>
+        </div>
+        <p class="statistics-hint">按上海时间，含起止当天 · 单次最多查询 366 天</p>
+        <p id="statisticsScope" class="statistics-hint" aria-live="polite">正在加载……</p>
+        <p id="statisticsError" class="dialog-feedback bad" role="alert" hidden></p>
+        <div class="statistics-metrics" aria-live="polite">
+          <div><span>已实现净收益</span><strong id="statisticsNet">—</strong><small id="statisticsProfitNote">正在读取 MT5 成交历史</small></div>
+          <div><span>止盈信号</span><strong id="statisticsTakeProfit">—</strong><small>非止损的平仓信号</small></div>
+          <div><span>止损信号</span><strong id="statisticsStopLoss">—</strong><small>策略止损触发</small></div>
+          <div><span>止盈占比</span><strong id="statisticsRate">—</strong><small id="statisticsTotal">正在读取平仓信号</small></div>
+        </div>
+        <div class="statistics-charts">
+          <div class="statistics-chart">
+            <div class="statistics-chart-heading"><h3 id="statisticsProfitTitle">累计净收益</h3><div class="statistics-chart-switch" aria-label="收益图表类型"><button class="button button-secondary" type="button" data-profit-chart="cumulative" aria-pressed="true">累计</button><button class="button button-secondary" type="button" data-profit-chart="daily" aria-pressed="false">每日</button></div></div>
+            <p class="statistics-hint" id="statisticsChartNote">区间起点归零</p>
+            <svg id="statisticsProfitChart" class="statistics-svg" role="img" aria-label="累计净收益曲线" hidden></svg>
+            <p id="statisticsProfitEmpty" class="statistics-chart-empty">正在读取 MT5 成交历史……</p>
+          </div>
+          <div class="statistics-chart"><h3 id="statisticsCountsTitle">每日止盈 / 止损</h3><div class="statistics-legend"><span><i class="take-profit-key"></i>止盈</span><span><i class="stop-loss-key"></i>止损</span></div><svg id="statisticsBars" class="statistics-svg" role="img" aria-label="每日止盈和止损数量" hidden></svg><p id="statisticsCountsEmpty" class="statistics-chart-empty">正在读取平仓信号……</p><p class="statistics-hint">按原始信号去重，多个客户端不重复计数</p></div>
+        </div>
+        <div class="statistics-chart statistics-recent"><div class="statistics-chart-heading"><h3>最近平仓成交</h3><span id="statisticsDealCount" class="statistics-hint"></span></div><div class="table-wrap"><table class="responsive-data-table"><thead><tr><th>平仓时间</th><th>客户端</th><th>品种</th><th>方向</th><th>原因</th><th>手数</th><th>净收益</th></tr></thead><tbody id="statisticsRecent"></tbody></table><p id="statisticsDealsEmpty" class="statistics-empty" hidden>所选日期内没有 MT5 平仓成交。</p></div></div>
+        <p class="statistics-hint statistics-footer">收益：本策略 MT5 已平仓成交 · 信号：成功执行的平仓信号 · 止盈占比不代表盈利胜率</p>
+      </section>
+
       <section class="panel" aria-labelledby="signalTitle">
         <div class="panel-heading list-heading">
           <div>
@@ -279,6 +314,7 @@
       </form>
     </dialog>
 
+    <script src="/static/trade-charts.js" defer></script>
     <script src="/static/app.js" defer></script>
   </body>
 </html>

@@ -90,6 +90,48 @@ select {
   margin-bottom: 20px;
 }
 
+.statistics-filters { display:flex; flex-wrap:wrap; align-items:end; gap:8px; }
+.statistics-panel .panel-heading { flex-wrap:wrap; }
+.statistics-filters label { display:flex; flex-direction:column; gap:6px; min-width:0; color:var(--muted); font-size:12px; }
+.statistics-filters input,.statistics-filters select { width:100%; min-width:0; min-height:36px; padding:6px 8px; color:var(--text); background:var(--panel-soft); border:1px solid var(--border); border-radius:6px; }
+.statistics-metrics { display:grid; grid-template-columns:repeat(4,1fr); margin-top:18px; border:1px solid var(--border); border-radius:10px; background:var(--panel-soft); }
+.statistics-metrics > div { padding:16px; border-right:1px solid var(--border); }
+.statistics-metrics > div:last-child { border-right:0; }
+.statistics-metrics span,.statistics-metrics small { display:block; color:var(--muted); font-size:12px; }
+.statistics-metrics strong { display:block; margin:4px 0; font-size:25px; font-variant-numeric:tabular-nums; }
+.statistics-charts { display:grid; grid-template-columns:minmax(0,1.8fr) minmax(0,1fr); gap:16px; margin-top:16px; }
+.statistics-chart { min-width:0; padding:16px; border:1px solid var(--border); border-radius:10px; background:var(--panel-soft); }
+.statistics-chart h3 { margin:0 0 8px; font-size:15px; }
+.statistics-legend { display:flex; gap:14px; color:var(--muted); font-size:12px; }
+.statistics-legend span { display:flex; align-items:center; gap:6px; }
+.statistics-legend i { display:inline-block; width:9px; height:9px; border-radius:2px; }
+.take-profit-key,.statistics-bar-take-profit { background:var(--success); }
+.stop-loss-key,.statistics-bar-stop-loss { background:var(--danger); }
+.statistics-chart-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; }
+.statistics-chart-heading h3 { margin:0; }
+.statistics-chart-switch { display:flex; gap:6px; }
+.statistics-chart-switch .button { min-height:32px; padding:5px 10px; font-size:12px; }
+.statistics-panel [aria-pressed="true"] { border-color:var(--accent); color:var(--accent); }
+.statistics-hint { color:var(--muted); font-size:12px; margin:8px 0 0; overflow-wrap:anywhere; }
+.statistics-svg { width:100%; height:230px; display:block; margin-top:10px; overflow:visible; }
+.statistics-svg text { font:11px "Segoe UI","Microsoft YaHei",sans-serif; fill:var(--muted); font-variant-numeric:tabular-nums; }
+.statistics-svg .chart-grid { stroke:var(--border); stroke-width:1; }
+.statistics-svg .chart-zero { stroke:var(--muted); stroke-dasharray:3 4; }
+.statistics-svg .chart-up { fill:var(--success); }
+.statistics-svg .chart-down { fill:var(--danger); }
+.statistics-svg .chart-line { fill:none; stroke:var(--success); stroke-width:2.5; stroke-linejoin:round; }
+.statistics-chart-hit:focus-visible { stroke:var(--accent); stroke-width:2; }
+.statistics-chart-empty { display:flex; align-items:center; justify-content:center; text-align:center; min-height:230px; margin:10px 0 0; padding:20px; color:var(--muted); font-size:13px; }
+.statistics-recent { margin-top:16px; }
+.statistics-recent table { font-variant-numeric:tabular-nums; }
+.statistics-footer { margin-top:14px; }
+.statistics-chart-detail { min-height:19px; }
+.statistics-panel [hidden] { display:none !important; }
+.statistics-metrics strong { overflow-wrap:anywhere; }
+.statistics-empty { margin:0; padding:16px; color:var(--muted); font-size:13px; }
+@media (max-width:760px) { .statistics-metrics { grid-template-columns:1fr 1fr; } .statistics-metrics > div:nth-child(2) { border-right:0; } .statistics-metrics > div:nth-child(-n+2) { border-bottom:1px solid var(--border); } .statistics-charts { grid-template-columns:1fr; } .statistics-filters { width:100%; } .statistics-filters label { flex:1; } }
+@media (max-width:480px) { .statistics-filters label { flex:1 1 calc(50% - 8px); } .statistics-filters input,.statistics-filters select { font-size:16px; min-height:44px; } .statistics-chart { padding:12px; } .statistics-metrics > div { padding:12px; min-width:0; } }
+
 .eyebrow {
   margin: 0 0 8px;
   color: var(--accent);
@@ -833,7 +875,7 @@ a:focus-visible, summary:focus-visible, select:focus-visible { outline: 2px soli
 }
 
 @media (max-width: 680px) {
-  html { scroll-padding-top: 72px; }
+  html { scroll-padding-top: 128px; }
   .page-shell { padding-bottom: calc(32px + env(safe-area-inset-bottom)); }
   .section-nav {
     position: sticky;

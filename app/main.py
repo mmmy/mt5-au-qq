@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from datetime import date, datetime, timedelta
 
-from fastapi import FastAPI, Query, Request, status
+from fastapi import FastAPI, HTTPException, Query, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -29,10 +30,11 @@ from app.models import (
     TradingToggleResponse,
     TradingViewSetupResponse,
     TradingViewWebhook,
+    TradeStatistics,
     WebhookResponse,
 )
 from app.multi_trading_service import MultiTradingService
-from app.trade_repository import TradeRepository
+from app.trade_repository import TRADING_TIMEZONE, TradeRepository
 from app.tradingview import TradingViewClient
 
 
@@ -198,6 +200,32 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/api/trade-orders", response_model=list[OrderItem])
     async def trade_orders(request: Request, limit: int = Query(default=100, ge=1, le=500)) -> list[OrderItem]:
         return request.app.state.trading_service.repository.list_orders(limit)
+
+    @app.get("/api/trade-statistics", response_model=TradeStatistics)
+    async def trade_statistics(
+        request: Request,
+        start_date: str | None = Query(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$"),
+        end_date: str | None = Query(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$"),
+        account: str | None = Query(default=None, pattern=r"^[A-Za-z0-9_-]{1,32}$"),
+    ) -> TradeStatistics:
+        today = datetime.now(TRADING_TIMEZONE).date()
+        try:
+            end = date.fromisoformat(end_date) if end_date else today
+            start = date.fromisoformat(start_date) if start_date else end - timedelta(days=6)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="日期必须使用 YYYY-MM-DD 格式") from exc
+        if start > end:
+            raise HTTPException(status_code=400, detail="开始日期不能晚于结束日期")
+        if end > today:
+            raise HTTPException(status_code=400, detail="结束日期不能晚于今天")
+        if (end - start).days > 365:
+            raise HTTPException(status_code=400, detail="统计范围不能超过 366 天")
+        service: MultiTradingService = request.app.state.trading_service
+        if account is not None and account not in service.workers:
+            raise HTTPException(status_code=404, detail="未知 MT5 客户端")
+        return TradeStatistics(**await request.app.state.trading_service.trade_statistics(
+            start.isoformat(), end.isoformat(), account
+        ))
 
     app.mount("/static", StaticFiles(directory=app_settings.static_dir), name="static")
 

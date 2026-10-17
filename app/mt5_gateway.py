@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -137,6 +138,74 @@ class Mt5Gateway:
         if action == TradeAction.REVERSE_TO_SHORT:
             return self._close(mt5.POSITION_TYPE_BUY) + self._open(mt5.ORDER_TYPE_SELL)
         raise Mt5ExecutionError(f"不支持的交易动作：{action}")
+
+    def history_deals(self, start: datetime, end: datetime) -> dict[str, Any]:
+        """Read realized deals for this configured symbol and magic number."""
+        self._ensure_initialized()
+        account = mt5.account_info()
+        if not account:
+            raise Mt5ExecutionError("MT5 当前账户信息不可用")
+        self._validate_account(account)
+        if start.tzinfo is None:
+            start = start.replace(tzinfo=timezone.utc)
+        if end.tzinfo is None:
+            end = end.replace(tzinfo=timezone.utc)
+        deals = mt5.history_deals_get(start.astimezone(timezone.utc), end.astimezone(timezone.utc))
+        if deals is None:
+            code, message = mt5.last_error()
+            raise Mt5ExecutionError(f"读取 MT5 成交历史失败：{code} {message}")
+        close_entries = {
+            getattr(mt5, "DEAL_ENTRY_OUT", 1),
+            getattr(mt5, "DEAL_ENTRY_OUT_BY", 3),
+        }
+        result: list[dict[str, Any]] = []
+        position_histories: dict[int, tuple] = {}
+        for deal in deals:
+            if getattr(deal, "symbol", None) != self.symbol:
+                continue
+            try:
+                if int(getattr(deal, "magic", 0)) != self.magic:
+                    continue
+            except (TypeError, ValueError):
+                continue
+            if getattr(deal, "entry", None) not in close_entries:
+                continue
+            raw_time = getattr(deal, "time", None)
+            try:
+                timestamp = datetime.fromtimestamp(float(raw_time), tz=timezone.utc).isoformat()
+            except (TypeError, ValueError, OSError, OverflowError):
+                timestamp = None
+            position_id = int(getattr(deal, "position_id", 0) or 0)
+            volume = float(getattr(deal, "volume", 0) or 0)
+            # Brokers may charge the opening leg separately. Allocate those costs
+            # by closed volume, even when the position opened before this date range.
+            opening_cost = 0.0
+            if position_id:
+                if position_id not in position_histories:
+                    history = mt5.history_deals_get(position=position_id)
+                    if history is None:
+                        raise Mt5ExecutionError("读取持仓开仓费用失败，请稍后重试")
+                    position_histories[position_id] = tuple(history)
+                openings = [d for d in position_histories[position_id]
+                            if getattr(d, "entry", None) == getattr(mt5, "DEAL_ENTRY_IN", 0)]
+                opened_volume = sum(float(getattr(d, "volume", 0) or 0) for d in openings)
+                if opened_volume > 0:
+                    opening_cost = sum(float(getattr(d, field, 0) or 0)
+                                       for d in openings for field in ("commission", "fee")) * volume / opened_volume
+            profit = opening_cost + sum(float(getattr(deal, field, 0) or 0) for field in ("profit", "swap", "commission", "fee"))
+            deal_type = getattr(deal, "type", None)
+            result.append({
+                "ticket": int(getattr(deal, "ticket", 0) or 0),
+                "time": timestamp,
+                "profit": profit,
+                "volume": volume,
+                "position_id": position_id,
+                "order": int(getattr(deal, "order", 0) or 0),
+                "symbol": self.symbol,
+                "side": "平多" if deal_type == getattr(mt5, "DEAL_TYPE_SELL", 1) else "平空" if deal_type == getattr(mt5, "DEAL_TYPE_BUY", 0) else None,
+                "exit_reason": "止损" if getattr(deal, "reason", None) == getattr(mt5, "DEAL_REASON_SL", 4) else "止盈",
+            })
+        return {"currency": str(getattr(account, "currency", "") or "").strip(), "deals": result}
 
     def _ensure_initialized(self) -> None:
         terminal = mt5.terminal_info() if self._initialized else None

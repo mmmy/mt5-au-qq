@@ -25,6 +25,21 @@ const elements = {
   signalEmptyState: document.querySelector("#signalEmptyState"),
   signalSummary: document.querySelector("#signalSummary"),
   clearSignalsButton: document.querySelector("#clearSignalsButton"),
+  statisticsStart: document.querySelector("#statisticsStart"),
+  statisticsEnd: document.querySelector("#statisticsEnd"),
+  statisticsAccount: document.querySelector("#statisticsAccount"),
+  statisticsApply: document.querySelector("#statisticsApply"),
+  statisticsScope: document.querySelector("#statisticsScope"),
+  statisticsError: document.querySelector("#statisticsError"),
+  statisticsNet: document.querySelector("#statisticsNet"),
+  statisticsProfitNote: document.querySelector("#statisticsProfitNote"),
+  statisticsTakeProfit: document.querySelector("#statisticsTakeProfit"),
+  statisticsStopLoss: document.querySelector("#statisticsStopLoss"),
+  statisticsRate: document.querySelector("#statisticsRate"),
+  statisticsTotal: document.querySelector("#statisticsTotal"),
+  statisticsBars: document.querySelector("#statisticsBars"),
+  statisticsRecent: document.querySelector("#statisticsRecent"),
+  statisticsDealsEmpty: document.querySelector("#statisticsDealsEmpty"),
 };
 let pendingCreate = null;
 let createDraft = null;
@@ -38,6 +53,137 @@ let refreshingDashboard = false;
 let monitoring = false;
 let tradingClients = [];
 let alertFormSettings = { side: "自动", validHours: 24, email: true };
+
+function isoDate(date) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(date).map((part) => [part.type, part.value]));
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+function shiftISODate(value, days) {
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
+}
+
+function formatShanghaiDateTime(value) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("zh-CN", {
+    timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  }).format(date);
+}
+
+function renderTradeStatistics(data) {
+  appliedStatistics = { start: data.start_date, end: data.end_date, account: data.account || "" };
+  document.querySelectorAll(".statistics-preset").forEach(button => {
+    const today = isoDate(new Date());
+    button.setAttribute("aria-pressed", String(data.end_date === today && data.start_date === shiftISODate(today, 1-Number(button.dataset.days))));
+  });
+  const scope = data.account ? `客户端 ${data.account}` : "全部客户端";
+  elements.statisticsScope.textContent = `已应用：${data.start_date} — ${data.end_date} · ${scope} · 上海 UTC+8`;
+  elements.statisticsNet.textContent = data.profit_available ? `${data.net_profit >= 0 ? "+" : ""}${Number(data.net_profit).toFixed(2)} ${data.profit_currency}` : "—";
+  elements.statisticsNet.className = data.profit_available ? (data.net_profit < 0 ? "bad" : "good") : "";
+  if (!data.history_available) {
+    elements.statisticsProfitNote.textContent = "MT5 成交历史暂不可用，请检查终端连接后重试。";
+  } else if (data.profit_status === "multiple_currencies") {
+    elements.statisticsProfitNote.textContent = (data.profit_by_currency || []).map((item) =>
+      `${item.client_ids.map((id) => `客户端 ${id}`).join(" / ")} · ${Number(item.net_profit).toFixed(2)} ${item.currency}`,
+    ).join("；");
+  } else if (data.profit_status === "currency_unavailable") {
+    const known = (data.profit_by_currency || []).map((item) =>
+      `${item.client_ids.map((id) => `客户端 ${id}`).join(" / ")} · ${Number(item.net_profit).toFixed(2)} ${item.currency}`,
+    ).join("；");
+    elements.statisticsProfitNote.textContent = `客户端 ${data.profit_currency_missing_clients.join("、")} 币种信息不可用，暂不合并收益。${known ? ` 已知币种小计：${known}` : ""}`;
+  } else if (!data.total_signal_count && !data.recent_deals?.length) {
+    elements.statisticsProfitNote.textContent = "所选日期内暂无平仓记录。";
+  } else {
+    elements.statisticsProfitNote.textContent = "已扣平仓及分摊开仓费用，含隔夜利息。";
+  }
+  elements.statisticsTakeProfit.textContent = data.take_profit_count;
+  elements.statisticsStopLoss.textContent = data.stop_loss_count;
+  elements.statisticsRate.textContent = data.total_signal_count ? `${(data.take_profit_count / data.total_signal_count * 100).toFixed(1)}%` : "—";
+  elements.statisticsTotal.textContent = `共 ${data.total_signal_count} 条平仓信号`;
+  window.TradeCharts.render(data);
+  elements.statisticsRecent.replaceChildren();
+  const deals = data.recent_deals || [];
+  document.getElementById("statisticsDealCount").textContent = data.history_available ? `最近 ${deals.length} 笔 / 共 ${data.closed_deal_count || 0} 笔成交` : "成交历史暂不可用";
+  elements.statisticsDealsEmpty.hidden = deals.length > 0;
+  elements.statisticsDealsEmpty.textContent = data.history_available
+    ? "所选日期内没有 MT5 平仓成交。"
+    : "读取 MT5 成交历史失败；请检查终端连接后重试。";
+  for (const item of deals) {
+    const row = document.createElement("tr");
+    appendCell(row, formatShanghaiDateTime(item.time));
+    appendCell(row, `客户端 ${item.client_id}`);
+    appendCell(row, item.symbol || "—");
+    appendCell(row, item.side || "—");
+    appendCell(row, item.exit_reason || "—", item.exit_reason === "止损" ? "bad" : "good");
+    appendCell(row, item.volume === undefined ? "—" : Number(item.volume).toFixed(2));
+    appendCell(row, `${Number(item.profit || 0).toFixed(2)} ${item.currency || ""}`.trim(), Number(item.profit || 0) < 0 ? "bad" : "good");
+    labelTableRow(row, elements.statisticsRecent.closest("table"));
+    elements.statisticsRecent.append(row);
+  }
+}
+let statisticsRequest = 0;
+let appliedStatistics = null;
+async function loadTradeStatistics({ useApplied = false, accountOnly = false } = {}) {
+  const start = (useApplied || accountOnly) && appliedStatistics ? appliedStatistics.start : elements.statisticsStart.value;
+  const end = (useApplied || accountOnly) && appliedStatistics ? appliedStatistics.end : elements.statisticsEnd.value;
+  const request = ++statisticsRequest;
+  elements.statisticsError.hidden = true;
+  const validation = !start || !end ? "请选择开始和结束日期。"
+    : start > end ? "开始日期不能晚于结束日期。"
+      : end > isoDate(new Date()) ? "结束日期不能晚于今天。"
+        : (Date.parse(`${end}T00:00:00Z`) - Date.parse(`${start}T00:00:00Z`)) / 86_400_000 > 365
+          ? "统计范围不能超过 366 天。" : "";
+  if (validation) {
+    elements.statisticsError.textContent = validation;
+    elements.statisticsError.hidden = false;
+    elements.statisticsApply.disabled = false;
+    elements.statisticsApply.textContent = "应用";
+    return;
+  }
+  const selected = elements.statisticsAccount.value;
+  const accountValue = useApplied && appliedStatistics ? appliedStatistics.account : selected;
+  const account = accountValue ? `&account=${encodeURIComponent(accountValue)}` : "";
+  elements.statisticsApply.disabled = true;
+  elements.statisticsApply.textContent = "读取中……";
+  try {
+    const data = await apiRequest(`/api/trade-statistics?start_date=${encodeURIComponent(start)}&end_date=${encodeURIComponent(end)}${account}`);
+    if (request === statisticsRequest) renderTradeStatistics(data);
+  } catch (error) {
+    if (request === statisticsRequest) { elements.statisticsError.textContent = error.message; elements.statisticsError.hidden = false; }
+  } finally {
+    if (request === statisticsRequest) { elements.statisticsApply.disabled = false; elements.statisticsApply.textContent = "应用"; }
+  }
+}
+function initializeTradeStatistics() {
+  if (!elements.statisticsStart) return;
+  const today = isoDate(new Date());
+  elements.statisticsStart.value = shiftISODate(today, -6); elements.statisticsEnd.value = today;
+  elements.statisticsStart.max = today; elements.statisticsEnd.max = today;
+  elements.statisticsApply.addEventListener("click", loadTradeStatistics);
+  elements.statisticsAccount.addEventListener("change", () => loadTradeStatistics({ accountOnly: true }));
+  for (const input of [elements.statisticsStart, elements.statisticsEnd]) {
+    input.addEventListener("keydown", event => { if (event.key === "Enter") { event.preventDefault(); loadTradeStatistics(); } });
+  }
+  document.querySelectorAll(".statistics-preset").forEach(button => button.addEventListener("click", () => {
+    const days = Number(button.dataset.days), presetToday = isoDate(new Date());
+    elements.statisticsStart.value = shiftISODate(presetToday, -days + 1); elements.statisticsEnd.value = presetToday; loadTradeStatistics();
+  }));
+}
+
+function updateStatisticsAccounts(clients) {
+  if (elements.statisticsAccount.options.length === clients.length + 1 &&
+    clients.every((client, index) => elements.statisticsAccount.options[index + 1]?.value === client.client_id)) return;
+  const selected = elements.statisticsAccount.value;
+  const options = [new Option("全部客户端", ""), ...clients.map((client) => new Option(`客户端 ${client.client_id}`, client.client_id))];
+  elements.statisticsAccount.replaceChildren(...options);
+  elements.statisticsAccount.value = clients.some((client) => client.client_id === selected) ? selected : "";
+}
 const signalTypes = [
   ["fractal", "分型"],
   ["pinbar", "Pinbar"],
@@ -599,6 +745,7 @@ async function loadTradingStatus() {
       }
     }
     tradingClients = clients;
+    updateStatisticsAccounts(clients);
     const ready = clients.filter((client) => clientReady(client, data.demo_only)).length;
     const enabled = clients.filter((client) => client.enabled).length;
     const execution = document.getElementById("executionStatus");
@@ -978,7 +1125,7 @@ async function refreshDashboard() {
   elements.refreshButton.textContent = "刷新中……";
   try {
     await Promise.all([loadAlerts({ quiet: true }), loadTradingStatus(), loadTradingViewSetup(), loadSignals(),
-      signalDialog.open ? Promise.resolve() : loadSignalSettings()]);
+      signalDialog.open ? Promise.resolve() : loadSignalSettings(), loadTradeStatistics({ useApplied: true })]);
   } finally {
     refreshingDashboard = false;
     elements.refreshButton.disabled = false;
@@ -1061,6 +1208,7 @@ alertParametersDialog.addEventListener("click", (event) => {
   if (event.target === alertParametersDialog) alertParametersDialog.close();
 });
 initializeAlertForm();
+initializeTradeStatistics();
 document.querySelector("#openSignalSettingsButton").addEventListener("click", openSignalSettings);
 document.querySelector("#signalSettingsForm").addEventListener("submit", saveSignalSettings);
 for (const button of document.querySelectorAll("[data-close-signal-dialog]")) {

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import multiprocessing as mp
 from dataclasses import asdict
+from datetime import datetime, timezone
 from threading import Lock
 
 from app.config import Mt5ClientConfig
@@ -26,6 +27,12 @@ def _serve(connection, config: Mt5ClientConfig, gateway_factory=Mt5Gateway) -> N
                     if volume is not None:
                         gateway.volume = volume
                     result = gateway.execute(action)
+                elif operation == "history_deals":
+                    start, end = argument
+                    result = gateway.history_deals(
+                        datetime.fromtimestamp(start, tz=timezone.utc),
+                        datetime.fromtimestamp(end, tz=timezone.utc),
+                    )
                 else:
                     raise ValueError(f"不支持的 MT5 操作：{operation}")
                 connection.send((True, result))
@@ -83,6 +90,9 @@ class ProcessMt5Gateway:
 
     def execute(self, action, *, volume=None):
         return self._call("execute", (action, volume))
+
+    def history_deals(self, start, end):
+        return self._call("history_deals", (start.timestamp(), end.timestamp()))
 
     def shutdown(self):
         with self._lock:

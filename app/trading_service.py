@@ -72,7 +72,8 @@ def webhook_signal_id(payload: TradingViewWebhook) -> str:
 class WorkItem:
     kind: str
     signal_id: str | None = None
-    future: Future[Mt5Status] | None = None
+    future: Future[Any] | None = None
+    history_range: tuple[datetime, datetime] | None = None
 
 
 class Mt5Worker:
@@ -117,6 +118,14 @@ class Mt5Worker:
         except FutureTimeoutError as exc:
             raise Mt5NotReadyError("读取 MT5 状态超时") from exc
 
+    def get_history(self, start: datetime, end: datetime, timeout: float = 20) -> dict[str, Any]:
+        future: Future[dict[str, Any]] = Future()
+        self._queue.put(WorkItem(kind="history_deals", future=future, history_range=(start, end)))
+        try:
+            return future.result(timeout=timeout)
+        except FutureTimeoutError as exc:
+            raise Mt5NotReadyError("读取 MT5 成交历史超时") from exc
+
     def _run(self) -> None:
         try:
             while not self._stopping.is_set():
@@ -126,6 +135,14 @@ class Mt5Worker:
                 if item.kind == "status" and item.future:
                     try:
                         item.future.set_result(self.gateway.status())
+                    except Exception as exc:
+                        item.future.set_exception(exc)
+                    continue
+                if item.kind == "history_deals" and item.future:
+                    try:
+                        if not item.history_range:
+                            raise ValueError("成交历史日期范围缺失")
+                        item.future.set_result(self.gateway.history_deals(*item.history_range))
                     except Exception as exc:
                         item.future.set_exception(exc)
                     continue
