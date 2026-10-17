@@ -134,6 +134,28 @@ def test_signal_trigger_price_reads_saved_payload(tmp_path: Path, source, price,
     assert "payload_json" not in signals[0].model_dump()
 
 
+@pytest.mark.parametrize(
+    ("alert_message", "expected"),
+    [("__STOPLOSS", "止损"), ("", "止盈"), ("anything-else", "止盈")],
+)
+def test_signal_exit_reason_distinguishes_stop_loss_from_all_other_closes(
+    tmp_path: Path, alert_message: str, expected: str,
+) -> None:
+    repository = TradeRepository(tmp_path / "exit-reason.db")
+    repository.initialize()
+    repository.insert_signal(
+        signal_id="close",
+        source="tradingview",
+        action="close_long",
+        status="success",
+        symbol="XAUUSD",
+        payload={"alertMessage": alert_message, "price": "4600"},
+    )
+
+    signal = repository.list_signals()[0]
+    assert signal.exit_reason == expected
+
+
 def test_webhook_rejects_expired_signal(tmp_path: Path) -> None:
     repository = TradeRepository(tmp_path / "trading.db")
     repository.initialize()

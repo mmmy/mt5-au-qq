@@ -633,7 +633,10 @@ async function loadSignals() {
       const row = document.createElement("tr");
       appendCell(row, formatDate(signal.received_at));
       appendCell(row, signal.source === "tradingview" ? "TradingView" : "手动");
-      appendCell(row, actionLabel(signal.action));
+      const action = signal.exit_reason
+        ? `${actionLabel(signal.action)} · ${signal.exit_reason}`
+        : actionLabel(signal.action);
+      appendCell(row, action);
       appendCell(row, signalStatusLabel(signal.status), `signal-status signal-status-${signal.status}`);
       appendCell(row, signal.symbol);
       appendCell(row, signal.trigger_price || "—");

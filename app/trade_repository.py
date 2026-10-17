@@ -208,9 +208,14 @@ class TradeRepository:
                 item = self._row_to_dict(row)
                 raw_payload = item.pop("payload_json")
                 item["trigger_price"] = None
+                item["exit_reason"] = None
                 if item["source"] == "tradingview":
                     try:
                         payload = json.loads(raw_payload)
+                        if isinstance(payload, dict) and item["action"] in {"close_long", "close_short"}:
+                            item["exit_reason"] = (
+                                "止损" if payload.get("alertMessage") == "__STOPLOSS" else "止盈"
+                            )
                         raw_price = payload.get("price") if isinstance(payload, dict) else None
                         if isinstance(raw_price, (str, int, float)) and not isinstance(raw_price, bool):
                             price = str(raw_price).strip()
@@ -219,6 +224,10 @@ class TradeRepository:
                                 item["trigger_price"] = price
                     except (ValueError, TypeError, InvalidOperation):
                         pass
+                elif item["action"] in {"close_long", "close_short"}:
+                    # Manual close signals do not carry TradingView metadata; by the
+                    # configured rule, every close that is not a stop loss is take profit.
+                    item["exit_reason"] = "止盈"
                 children = connection.execute("SELECT client_id, status, symbol, error FROM trade_signals WHERE parent_signal_id=? ORDER BY client_id", (item["signal_id"],)).fetchall()
                 item["executions"] = [self._row_to_dict(child) for child in children]
                 items.append(SignalItem(**item))

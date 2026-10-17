@@ -119,6 +119,7 @@ class SignalItem(BaseModel):
     status: str
     symbol: str
     trigger_price: str | None = None
+    exit_reason: str | None = None
     error: str | None = None
     received_at: str
     executed_at: str | None = None
