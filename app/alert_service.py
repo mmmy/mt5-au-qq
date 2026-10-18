@@ -8,7 +8,8 @@ from typing import Any
 from uuid import UUID
 
 from app.alert_template import SIGNAL_DISTANCE_INPUTS, AlertTemplateBuilder, decimal_to_string, parse_prices
-from app.errors import AlertNotFoundError, TemplateError, TradingViewError
+from app.errors import AlertNotFoundError, TemplateError, TradingViewError, ValidationError
+from app.chart_snapshot import chart_snapshot
 from app.models import AlertItem, AlertSignalSettings, CreateAlertResponse, DeleteAlertResponse
 from app.trade_repository import TradeRepository
 from app.tradingview import TradingViewClient
@@ -110,6 +111,11 @@ class AlertService:
             )
             settings = self.template_builder.strategy_settings(template)
             signal_snapshot = self.template_builder.signal_settings_from_template(template)
+            try:
+                chart_inputs_snapshot = chart_snapshot(template)
+            except ValidationError:
+                # Keep existing alert creation compatible with older templates.
+                chart_inputs_snapshot = None
             requested_hours = decimal_to_string(valid_hours) if valid_hours is not None else None
             alert_id = await self.client.create_alert(template)
             if alert_id is None:
@@ -144,9 +150,23 @@ class AlertService:
                     signal_settings=signal_snapshot.model_dump(mode="json"),
                     valid_hours=requested_hours,
                     email=email,
+                    chart_snapshot=chart_inputs_snapshot,
                 )
 
             return CreateAlertResponse(created=True, prices=price_strings, alert=created_alert)
+
+    async def get_chart_snapshot(self, alert_id: int) -> dict[str, Any]:
+        # Check current ownership even when a local snapshot exists.
+        alerts = await self.client.list_alerts()
+        raw = next((a for a in alerts if str(a.get("alert_id")) == str(alert_id) and self._is_project_alert(a)), None)
+        if raw is None:
+            raise AlertNotFoundError()
+        config = self.repository.get_alert_configs([alert_id]).get(alert_id) if self.repository else None
+        if config and config.get("chart_snapshot"):
+            return config["chart_snapshot"]
+        # Older records may still carry the full snapshot in TradingView's response.
+        # Never rebuild a historical alert from today's template/default settings.
+        return chart_snapshot(raw)
 
     async def delete_alert(self, alert_id: int) -> DeleteAlertResponse:
         async with self._mutation_lock:

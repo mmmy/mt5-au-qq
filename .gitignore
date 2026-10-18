@@ -34,3 +34,4 @@ data/*.sqlite*
 .agents/skills/impeccable
 .codex/hooks.json
 unused.db
+data/browser-sync-qa/

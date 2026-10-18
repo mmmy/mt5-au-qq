@@ -89,7 +89,7 @@ class TradeRepository:
             if "parent_signal_id" not in columns:
                 connection.execute("ALTER TABLE trade_signals ADD COLUMN parent_signal_id TEXT")
             alert_columns = {row["name"] for row in connection.execute("PRAGMA table_info(tv_alert_configs)")}
-            for column in ("signal_settings_json", "valid_hours"):
+            for column in ("signal_settings_json", "valid_hours", "chart_snapshot_json"):
                 if column not in alert_columns:
                     connection.execute(f"ALTER TABLE tv_alert_configs ADD COLUMN {column} TEXT")
             if "email" not in alert_columns:
@@ -416,13 +416,14 @@ class TradeRepository:
         signal_settings: dict[str, Any] | None = None,
         valid_hours: str | None = None,
         email: bool | None = None,
+        chart_snapshot: dict[str, Any] | None = None,
     ) -> None:
         with self._connect() as connection:
             connection.execute(
                 """
                 INSERT INTO tv_alert_configs
-                    (alert_id, prices_json, side, valid_bars, start_time_ms, end_time_ms, resolution, created_at, signal_settings_json, valid_hours, email)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    (alert_id, prices_json, side, valid_bars, start_time_ms, end_time_ms, resolution, created_at, signal_settings_json, valid_hours, email, chart_snapshot_json)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(alert_id) DO UPDATE SET
                     prices_json = excluded.prices_json,
                     side = excluded.side,
@@ -432,7 +433,8 @@ class TradeRepository:
                     resolution = excluded.resolution,
                     signal_settings_json = COALESCE(excluded.signal_settings_json, tv_alert_configs.signal_settings_json),
                     valid_hours = COALESCE(excluded.valid_hours, tv_alert_configs.valid_hours),
-                    email = COALESCE(excluded.email, tv_alert_configs.email)
+                    email = COALESCE(excluded.email, tv_alert_configs.email),
+                    chart_snapshot_json = COALESCE(excluded.chart_snapshot_json, tv_alert_configs.chart_snapshot_json)
                 """,
                 (
                     alert_id,
@@ -446,6 +448,7 @@ class TradeRepository:
                     json.dumps(signal_settings, ensure_ascii=False) if signal_settings is not None else None,
                     valid_hours,
                     int(email) if email is not None else None,
+                    json.dumps(chart_snapshot, ensure_ascii=False) if chart_snapshot is not None else None,
                 ),
             )
 
@@ -464,6 +467,8 @@ class TradeRepository:
             item["prices"] = json.loads(item.pop("prices_json"))
             snapshot = item.pop("signal_settings_json")
             item["signal_settings"] = json.loads(snapshot) if snapshot is not None else None
+            chart = item.pop("chart_snapshot_json")
+            item["chart_snapshot"] = json.loads(chart) if chart is not None else None
             result[int(item["alert_id"])] = item
         return result
 

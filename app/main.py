@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.alert_service import AlertService
 from app.alert_template import AlertTemplateBuilder
+from app.browser_sync import BrowserBridge, router as browser_sync_router
 from app.config import Settings
 from app.errors import AppError
 from app.models import (
@@ -75,14 +76,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             repository=repository,
         )
         app.state.trading_service = MultiTradingService(repository, app_settings)
+        app.state.browser_bridge = BrowserBridge(app_settings.database_file, app.state.alert_service)
         app.state.trading_service.start()
         try:
             yield
         finally:
-            app.state.trading_service.stop()
+            try:
+                await app.state.browser_bridge.shutdown()
+            finally:
+                app.state.trading_service.stop()
 
     app = FastAPI(title="MT5 AU QQ", version="0.1.0", lifespan=lifespan)
     app.state.settings = app_settings
+    app.include_router(browser_sync_router)
 
     @app.middleware("http")
     async def add_cache_control_header(request: Request, call_next):

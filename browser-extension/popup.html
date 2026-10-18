@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>MT5 AU 图表同步</title>
+<link rel="stylesheet" href="popup.css"></head><body>
+<h1>图表同步</h1><p id="status" role="status">正在读取状态……</p>
+<form id="pairForm">
+<label for="backend">后端地址</label><input id="backend" type="url" value="http://127.0.0.1" required>
+<label for="label">浏览器名称</label><input id="label" value="服务器 Chrome" maxlength="60" required>
+<label for="code">管理页生成的配对码</label><input id="code" autocomplete="off" spellcheck="false" required>
+<button id="pair" type="submit">配对并连接</button></form>
+<div class="actions"><button id="connect" type="button">重新连接</button><button id="forget" type="button">断开配对</button></div>
+<p class="help">保留当前 Chrome 登录状态。配对后在程序网页选择图表和策略，再同步参数。已有 TradingView 警报使用独立快照。</p>
+<script src="popup.js" type="module"></script></body></html>

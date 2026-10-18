@@ -101,6 +101,24 @@
           <p class="form-help">开始时间由后端自动设为当前 K 线开始时间；有效期按自然时间计算，包含休市时间。预计结束：<strong id="alertEndTime">—</strong></p>
           <div class="create-submit"><span class="form-help">2 分钟周期</span><button id="createButton" class="button button-primary" type="submit" aria-haspopup="dialog" aria-controls="createAlertDialog">创建警报</button></div>
         </form>
+        <div id="browserSync" class="browser-sync" aria-labelledby="browserSyncTitle">
+          <div class="panel-heading"><h3 id="browserSyncTitle">TradingView 图表预览</h3><span id="browserConnection" class="form-help">未连接扩展</span></div>
+          <p class="form-help">把当前输入或已有警报的策略参数同步到指定图表，查看 K 线效果。最多 20 个价格，空余位置会关闭并清零；已有警报使用独立快照。</p>
+          <div class="browser-sync-controls">
+            <div><label for="browserClient">浏览器</label><select id="browserClient"><option value="">请先配对扩展</option></select></div>
+            <button id="discoverCharts" type="button" class="button button-secondary">读取图表</button>
+            <div class="browser-sync-target"><label for="browserTarget">目标图表与策略</label><select id="browserTarget"><option value="">请先读取图表并选择目标</option></select></div>
+            <button id="syncDraft" type="button" class="button button-secondary">预览当前输入</button>
+          </div>
+          <p id="browserTargetInfo" class="form-help" hidden></p>
+          <p id="browserSyncStatus" class="form-help" role="status" aria-live="polite">先安装并配对扩展，再读取已打开的 TradingView 图表。</p>
+          <details class="connection-setup">
+            <summary>扩展安装与配对</summary>
+            <ol class="form-help"><li><a href="/api/browser-sync/extension.zip">下载扩展 ZIP</a>并解压到固定文件夹。</li><li>在使用原登录状态的 Chrome 中打开 <code>chrome://extensions</code>，开启开发者模式，点击“加载已解压的扩展程序”，选择解压后的文件夹。</li><li>生成配对码，在扩展弹窗填写本机后端地址（例如 <code>http://127.0.0.1</code>）和配对码，点击“配对并连接”。配对码 2 分钟内有效且只能使用一次。</li></ol>
+            <div class="browser-pair-actions"><button id="browserPairCode" class="button button-secondary" type="button">生成配对码</button><output id="browserPairOutput" aria-live="polite"></output><button id="revokeBrowser" class="button button-danger" type="button">撤销所选浏览器</button></div>
+            <details><summary>远程页面管理密钥</summary><p class="form-help">服务器本机 localhost 页面自动验证。远程管理时，在后端环境变量中设置 BROWSER_SYNC_ADMIN_TOKEN，重启后在这里填写；远程连接使用 HTTPS。</p><label for="browserAdminToken">管理密钥</label><div class="browser-pair-actions"><input id="browserAdminToken" type="password" autocomplete="off"><button id="browserAuthorize" class="button button-secondary" type="button">连接管理通道</button></div></details>
+          </details>
+        </div>
         <details class="connection-setup">
           <summary>手动配置 TradingView 警报</summary>
           <p class="manual-setup-help form-help">仅在 TradingView 中手动创建策略警报时使用。在本页创建警报会自动填写以下内容。</p>
@@ -316,5 +334,6 @@
 
     <script src="/static/trade-charts.js" defer></script>
     <script src="/static/app.js" defer></script>
+    <script src="/static/browser-sync.js" defer></script>
   </body>
 </html>

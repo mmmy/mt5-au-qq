@@ -1,0 +1,13 @@
+:root { color-scheme: dark; font: 14px "Segoe UI", "Microsoft YaHei", sans-serif; background: #101b27; color: #edf4fb; }
+body { width: 330px; margin: 0; padding: 20px; box-sizing: border-box; }
+h1 { margin: 0 0 12px; font-size: 20px; }
+p { line-height: 1.6; overflow-wrap: anywhere; }
+label { display: block; margin: 14px 0 6px; }
+input { box-sizing: border-box; width: 100%; padding: 10px; border: 1px solid #52647a; border-radius: 6px; background: #081019; color: inherit; font: inherit; }
+button { min-height: 40px; padding: 8px 12px; background: #d6a846; color: #081019; border: 1px solid transparent; border-radius: 6px; font: inherit; cursor: pointer; }
+button:disabled { opacity: .6; cursor: wait; }
+form button { width: 100%; margin-top: 16px; }
+.actions { display: flex; gap: 8px; margin-top: 12px; }
+.actions button { color: inherit; background: transparent; border-color: #52647a; }
+.help { color: #a2b3c4; font-size: 12px; margin-bottom: 0; }
+:focus-visible { outline: 2px solid #d6a846; outline-offset: 3px; }

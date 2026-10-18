@@ -874,6 +874,26 @@ a:focus-visible, summary:focus-visible, select:focus-visible { outline: 2px soli
   *, *::before, *::after { transition: none !important; scroll-behavior: auto !important; }
 }
 
+.browser-sync { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border); }
+.browser-sync h3 { margin: 0; font-size: 16px; }
+.browser-sync > .panel-heading { padding: 0; gap: 16px; margin-bottom: 12px; }
+.browser-sync .form-help { line-height: 1.7; overflow-wrap: anywhere; }
+.browser-sync-controls { display: grid; grid-template-columns: minmax(170px, 1fr) auto; gap: 12px; align-items: end; }
+.browser-sync-controls label { display: block; margin-bottom: 6px; font-size: 13px; }
+.browser-sync-controls select, .browser-pair-actions input { width: 100%; min-width: 0; min-height: 46px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 9px; background: var(--bg); color: var(--text); }
+.browser-pair-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 12px 0; }
+.browser-pair-actions output { color: var(--accent); overflow-wrap: anywhere; }
+.browser-pair-actions input { min-width: 0; max-width: 100%; }
+.browser-sync .sync-error { color: var(--danger); }
+.browser-sync-confirm { padding: 24px; overflow-wrap: anywhere; }
+.browser-sync-confirm p { line-height: 1.7; }
+.browser-sync-confirm h3 { margin-top: 0; }
+@media (max-width: 680px) {
+  .browser-sync-controls { grid-template-columns: minmax(0, 1fr); }
+  .browser-sync-dialog { height: auto; max-height: calc(100dvh - 24px); overflow-y: auto; }
+  .browser-sync-confirm { padding: 20px; }
+}
+
 @media (max-width: 680px) {
   html { scroll-padding-top: 128px; }
   .page-shell { padding-bottom: calc(32px + env(safe-area-inset-bottom)); }
