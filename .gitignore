@@ -33,3 +33,4 @@ data/*.sqlite*
 
 .agents/skills/impeccable
 .codex/hooks.json
+unused.db
