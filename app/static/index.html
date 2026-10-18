@@ -101,7 +101,7 @@
           <p class="form-help">开始时间由后端自动设为当前 K 线开始时间；有效期按自然时间计算，包含休市时间。预计结束：<strong id="alertEndTime">—</strong></p>
           <div class="create-submit"><span class="form-help">2 分钟周期</span><button id="createButton" class="button button-primary" type="submit" aria-haspopup="dialog" aria-controls="createAlertDialog">创建警报</button></div>
         </form>
-        <div id="browserSync" class="browser-sync" aria-labelledby="browserSyncTitle">
+        <div id="browserSync" class="browser-sync" aria-labelledby="browserSyncTitle" hidden>
           <div class="panel-heading"><h3 id="browserSyncTitle">TradingView 图表预览</h3><span id="browserConnection" class="form-help">未连接扩展</span></div>
           <p class="form-help">把当前输入或已有警报的策略参数同步到指定图表，查看 K 线效果。最多 20 个价格，空余位置会关闭并清零；已有警报使用独立快照。</p>
           <div class="browser-sync-controls">

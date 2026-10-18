@@ -1,4 +1,8 @@
 (() => {
+  // Temporarily hidden. Change the default to true when this feature is enabled again.
+  const enabled = window.BROWSER_SYNC_UI_ENABLED ?? false;
+  document.getElementById("browserSync").hidden = !enabled;
+  if (!enabled) return;
   const $ = (id) => document.getElementById(id);
   let token = "", clients = [], busy = false, pairTimer;
   const status = (text, error = false) => {

@@ -988,7 +988,9 @@ function renderAlerts(alerts) {
     deleteButton.className = "button button-danger";
     deleteButton.textContent = "删除";
     deleteButton.addEventListener("click", () => deleteAlert(alert, deleteButton));
-    actions.append(parameterButton, syncButton, deleteButton);
+    actions.append(parameterButton);
+    if (window.BrowserSync) actions.append(syncButton);
+    actions.append(deleteButton);
     actionCell.append(actions);
     row.append(actionCell);
     labelTableRow(row, elements.tableBody.closest("table"));

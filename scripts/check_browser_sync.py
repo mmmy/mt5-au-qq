@@ -107,6 +107,8 @@ def run():
                     headless=True, viewport={"width": 1440, "height": 1100},
                     args=[f"--disable-extensions-except={extension}", f"--load-extension={extension}"])
                 try:
+                    # This check explicitly opts into the currently hidden UI.
+                    context.add_init_script("window.BROWSER_SYNC_UI_ENABLED = true")
                     worker = context.service_workers[0] if context.service_workers else context.wait_for_event("serviceworker")
                     popup = context.new_page()
                     popup.goto(worker.url.replace("background.js", "popup.html"))
