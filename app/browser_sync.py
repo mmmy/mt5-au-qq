@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 from contextlib import contextmanager
 import hashlib
+import hmac
 import io
 import json
 import os
@@ -26,6 +27,8 @@ from app.models import CreateAlertRequest
 router = APIRouter(prefix="/api/browser-sync", tags=["browser-sync"])
 EXTENSION_ORIGIN = re.compile(r"chrome-extension://[a-p]{32}\Z")
 IDENTITY = ("tab_id", "document_id", "chart_id", "study_id", "pine_id", "pine_version", "symbol", "resolution")
+SESSION_COOKIE = "browser_sync_session"
+SESSION_SECONDS = 30 * 24 * 60 * 60
 
 
 def encode(value):
@@ -250,20 +253,59 @@ def same_origin(request: Request):
         raise HTTPException(403, "不允许跨站管理浏览器")
 
 
+def session_signature(service: BrowserBridge, request: Request, payload: str) -> str:
+    audience = f"{request.url.scheme}://{request.url.netloc}"
+    return hmac.new(service.admin_token.encode(), f"browser-sync:{audience}:{payload}".encode(), hashlib.sha256).hexdigest()
+
+
+def valid_session(service: BrowserBridge, request: Request) -> bool:
+    cookie = request.cookies.get(SESSION_COOKIE, "")
+    if not re.fullmatch(r"\d{10,12}\.[0-9a-f]{32}\.[0-9a-f]{64}", cookie):
+        return False
+    expires, nonce, signature = cookie.split(".")
+    if not time.time() < int(expires) <= time.time() + SESSION_SECONDS + 60:
+        return False
+    return secrets.compare_digest(signature, session_signature(service, request, f"{expires}.{nonce}"))
+
+
+def set_session(response: Response, request: Request, service: BrowserBridge):
+    payload = f"{int(time.time()) + SESSION_SECONDS}.{secrets.token_hex(16)}"
+    response.set_cookie(SESSION_COOKIE, f"{payload}.{session_signature(service, request, payload)}",
+                        max_age=SESSION_SECONDS, path="/api/browser-sync", httponly=True,
+                        secure=request.url.scheme == "https", samesite="strict")
+
+
 def admin(request: Request, service: BrowserBridge = Depends(bridge)):
     same_origin(request)
     token = request.headers.get("authorization", "").removeprefix("Bearer ")
-    if not secrets.compare_digest(token.encode(), service.admin_token.encode()):
-        raise HTTPException(401, "请在服务器本机的 localhost 页面配对；远程管理需填写 BROWSER_SYNC_ADMIN_TOKEN")
+    if not secrets.compare_digest(token.encode(), service.admin_token.encode()) and not valid_session(service, request):
+        raise HTTPException(401, "当前网页尚未授权或授权已过期，请填写管理密钥；无需重新配对扩展")
     return service
 
 
 @router.get("/session")
-async def local_session(request: Request, service: BrowserBridge = Depends(bridge)):
+async def local_session(request: Request, response: Response, service: BrowserBridge = Depends(bridge)):
     same_origin(request)
-    if request.client.host not in ("127.0.0.1", "::1") or request.url.hostname not in ("localhost", "127.0.0.1", "::1"):
-        raise HTTPException(403, "本机配对入口仅允许 localhost；远程访问请使用配置的管理密钥")
-    return {"token": service.admin_token}
+    local = request.client.host in ("127.0.0.1", "::1") and request.url.hostname in ("localhost", "127.0.0.1", "::1")
+    if not local and not valid_session(service, request):
+        raise HTTPException(403, "首次访问请填写管理密钥，之后此浏览器会自动恢复授权；无需重新配对扩展")
+    set_session(response, request, service)
+    # Preserve the local CLI bootstrap; remote browsers never receive the admin key.
+    return {"authenticated": True, **({"token": service.admin_token} if local else {})}
+
+
+@router.post("/session")
+async def authorize_session(request: Request, response: Response, service: BrowserBridge = Depends(admin)):
+    set_session(response, request, service)
+    return {"authenticated": True}
+
+
+@router.delete("/session")
+async def logout_session(request: Request, response: Response):
+    same_origin(request)
+    response.delete_cookie(SESSION_COOKIE, path="/api/browser-sync", httponly=True,
+                           secure=request.url.scheme == "https", samesite="strict")
+    return {"authenticated": False}
 
 
 @router.get("/clients")

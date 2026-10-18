@@ -102,10 +102,10 @@
           <div class="create-submit"><span class="form-help">2 分钟周期</span><button id="createButton" class="button button-primary" type="submit" aria-haspopup="dialog" aria-controls="createAlertDialog">创建警报</button></div>
         </form>
         <div id="browserSync" class="browser-sync" aria-labelledby="browserSyncTitle" hidden>
-          <div class="panel-heading"><h3 id="browserSyncTitle">TradingView 图表预览</h3><span id="browserConnection" class="form-help">未连接扩展</span></div>
+          <div class="panel-heading"><h3 id="browserSyncTitle">TradingView 图表预览</h3><span id="browserConnection" class="form-help">正在恢复连接……</span></div>
           <p class="form-help">把当前输入或已有警报的策略参数同步到指定图表，查看 K 线效果。最多 20 个价格，空余位置会关闭并清零；已有警报使用独立快照。</p>
           <div class="browser-sync-controls">
-            <div><label for="browserClient">浏览器</label><select id="browserClient"><option value="">请先配对扩展</option></select></div>
+            <div><label for="browserClient">浏览器</label><select id="browserClient"><option value="">正在读取已配对的浏览器……</option></select></div>
             <button id="discoverCharts" type="button" class="button button-secondary">读取图表</button>
             <div class="browser-sync-target"><label for="browserTarget">目标图表与策略</label><select id="browserTarget"><option value="">请先读取图表并选择目标</option></select></div>
             <button id="syncDraft" type="button" class="button button-secondary">预览当前输入</button>
@@ -116,7 +116,7 @@
             <summary>扩展安装与配对</summary>
             <ol class="form-help"><li><a href="/api/browser-sync/extension.zip">下载扩展 ZIP</a>并解压到固定文件夹。</li><li>在使用原登录状态的 Chrome 中打开 <code>chrome://extensions</code>，开启开发者模式，点击“加载已解压的扩展程序”，选择解压后的文件夹。</li><li>生成配对码，在扩展弹窗填写本机后端地址（例如 <code>http://127.0.0.1</code>）和配对码，点击“配对并连接”。配对码 2 分钟内有效且只能使用一次。</li></ol>
             <div class="browser-pair-actions"><button id="browserPairCode" class="button button-secondary" type="button">生成配对码</button><output id="browserPairOutput" aria-live="polite"></output><button id="revokeBrowser" class="button button-danger" type="button">撤销所选浏览器</button></div>
-            <details><summary>远程页面管理密钥</summary><p class="form-help">服务器本机 localhost 页面自动验证。远程管理时，在后端环境变量中设置 BROWSER_SYNC_ADMIN_TOKEN，重启后在这里填写；远程连接使用 HTTPS。</p><label for="browserAdminToken">管理密钥</label><div class="browser-pair-actions"><input id="browserAdminToken" type="password" autocomplete="off"><button id="browserAuthorize" class="button button-secondary" type="button">连接管理通道</button></div></details>
+            <details id="browserAdminDetails"><summary>远程页面管理密钥</summary><p class="form-help">首次访问填写一次管理密钥，网页会记住授权；刷新和重新打开后自动恢复。扩展配对只需首次完成，网页授权与扩展配对分别保存。服务器本机 localhost 自动验证，远程连接使用 HTTPS。</p><label for="browserAdminToken">管理密钥</label><div class="browser-pair-actions"><input id="browserAdminToken" type="password" autocomplete="off"><button id="browserAuthorize" class="button button-secondary" type="button">连接并记住授权</button><button id="browserLogout" class="button button-secondary" type="button" disabled>退出网页授权</button></div></details>
           </details>
         </div>
         <details class="connection-setup">

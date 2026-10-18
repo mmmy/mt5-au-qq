@@ -60,6 +60,13 @@ def run():
         app.include_router(router)
         app.mount("/static", StaticFiles(directory=ROOT / "app/static"))
 
+        @app.post("/test/restart-bridge")
+        async def restart_bridge():
+            # Only this isolated smoke-test app exposes this route.
+            await app.state.browser_bridge.shutdown()
+            app.state.browser_bridge = BrowserBridge(repository.database_file, service)
+            return {"restarted": True}
+
         @app.get("/")
         async def index():
             return FileResponse(ROOT / "app/static/index.html")
@@ -96,6 +103,7 @@ def run():
         thread = threading.Thread(target=server.run, kwargs={"sockets": [listener]}, daemon=True)
         thread.start()
         base = f"http://127.0.0.1:{port}"
+        remote_base = f"http://browser-sync.test:{port}"
         for _ in range(100):
             if server.started:
                 break
@@ -105,10 +113,9 @@ def run():
                 extension = str(ROOT / "browser-extension")
                 context = playwright.chromium.launch_persistent_context(str(directory / "profile"), channel="msedge",
                     headless=True, viewport={"width": 1440, "height": 1100},
-                    args=[f"--disable-extensions-except={extension}", f"--load-extension={extension}"])
+                    args=[f"--disable-extensions-except={extension}", f"--load-extension={extension}",
+                          "--host-resolver-rules=MAP browser-sync.test 127.0.0.1"])
                 try:
-                    # This check explicitly opts into the currently hidden UI.
-                    context.add_init_script("window.BROWSER_SYNC_UI_ENABLED = true")
                     worker = context.service_workers[0] if context.service_workers else context.wait_for_event("serviceworker")
                     popup = context.new_page()
                     popup.goto(worker.url.replace("background.js", "popup.html"))
@@ -136,11 +143,34 @@ def run():
                     dashboard = context.new_page()
                     errors = []
                     dashboard.on("pageerror", lambda error: errors.append(str(error)))
-                    dashboard.goto(base)
+                    dashboard.goto(remote_base)
+                    expect(dashboard.locator("#browserSync")).to_be_visible()
+                    expect(dashboard.locator("#browserConnection")).to_contain_text("当前网页未授权")
+                    dashboard.locator("#browserAdminToken").fill(token)
+                    dashboard.locator("#browserAuthorize").click()
                     expect(dashboard.locator("#browserConnection")).to_contain_text("1 个浏览器已连接", timeout=10000)
-                    dashboard.locator("#discoverCharts").click()
-                    expect(dashboard.locator("#browserSyncStatus")).to_contain_text("找到 1 个", timeout=15000)
+                    expect(dashboard.locator("#browserTarget option")).to_have_count(2, timeout=15000)
                     dashboard.locator("#browserTarget").select_option(index=1)
+                    selected = dashboard.locator("#browserTarget").input_value()
+                    client_id = dashboard.locator("#browserClient").input_value()
+                    for _ in range(3):
+                        dashboard.reload()
+                        expect(dashboard.locator("#browserConnection")).to_contain_text("1 个浏览器已连接")
+                        expect(dashboard.locator("#browserClient")).to_have_value(client_id)
+                        expect(dashboard.locator("#browserTarget")).to_have_value(selected)
+                    assert len(bridge.clients()) == 1
+                    dashboard.close()
+                    dashboard = context.new_page()
+                    dashboard.on("pageerror", lambda error: errors.append(str(error)))
+                    dashboard.goto(remote_base)
+                    expect(dashboard.locator("#browserTarget")).to_have_value(selected)
+                    assert "token" not in dashboard.evaluate("Object.keys(localStorage).join(',')")
+                    httpx.post(base + "/test/restart-bridge").raise_for_status()
+                    dashboard.reload()
+                    expect(dashboard.locator("#browserConnection")).to_contain_text("1 个浏览器已连接", timeout=20000)
+                    expect(dashboard.locator("#browserTarget")).to_have_value(selected, timeout=20000)
+                    assert len(app.state.browser_bridge.clients()) == 1
+                    assert chart.evaluate("window.chartWrites") == 0
                     dashboard.locator("#prices").fill("4600, 4620.5")
                     dashboard.locator("#syncDraft").click()
                     dashboard.get_by_role("button", name="同步并校验", exact=True).click()
@@ -169,7 +199,7 @@ def run():
                     dashboard.get_by_role("button", name="同步并校验", exact=True).click()
                     expect(dashboard.locator("#browserSyncStatus")).to_have_class("form-help sync-error", timeout=15000)
                     assert chart.evaluate("window.chartWrites") == 0
-                    print("PASS: real MV3 pairing, authenticated WebSocket, draft/replay readback, navigation guard, desktop/mobile UI")
+                    print("PASS: remote-page authorization survives three reloads, page reopen and bridge restart without re-pairing; selected chart restored; real MV3/WS draft/replay readback and navigation guard")
                     print("Screenshots:", output)
                 finally:
                     context.close()

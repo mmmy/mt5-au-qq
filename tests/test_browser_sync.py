@@ -129,6 +129,51 @@ def test_websocket_rejects_unknown_origin_and_invalid_credentials(setup):
     assert rejected.value.code == 4001
 
 
+def test_remote_page_cookie_survives_reload_new_page_and_backend_restart(setup):
+    local, bridge, service, _ = setup
+    headers, auth, _ = pair(local)
+    with TestClient(local.app, base_url="http://public.test", client=("203.0.113.9", 50000)) as remote:
+        assert remote.get("/api/browser-sync/session").status_code == 403
+        response = remote.post("/api/browser-sync/session", headers=headers)
+        assert response.json() == {"authenticated": True}
+        cookie_header = response.headers["set-cookie"]
+        assert "HttpOnly" in cookie_header and "SameSite=strict" in cookie_header and "Max-Age=2592000" in cookie_header
+        assert bridge.admin_token not in cookie_header
+        for _ in range(3):
+            assert remote.get("/api/browser-sync/session").json() == {"authenticated": True}
+            clients = remote.get("/api/browser-sync/clients").json()
+            assert clients[0]["id"] == auth["client_id"]
+        # A new page/context with the browser's saved cookie needs no bearer key.
+        with TestClient(local.app, base_url="http://public.test", client=("203.0.113.9", 50001)) as reopened:
+            reopened.cookies.update(remote.cookies)
+            assert reopened.get("/api/browser-sync/session").json() == {"authenticated": True}
+            local.app.state.browser_bridge = BrowserBridge(bridge.database, service)
+            assert reopened.get("/api/browser-sync/clients").json()[0]["id"] == auth["client_id"]
+            assert reopened.post("/api/browser-sync/pair-code").status_code == 200
+        assert remote.delete("/api/browser-sync/session").json() == {"authenticated": False}
+        assert remote.get("/api/browser-sync/clients").status_code == 401
+        assert bridge.authenticate_client(auth["client_id"], auth["token"])
+
+
+def test_page_cookie_is_bound_to_origin_and_rejects_forgery_and_expiry(setup):
+    from app.browser_sync import SESSION_COOKIE, SESSION_SECONDS
+    local, bridge, _, _ = setup
+    headers = {"Authorization": f"Bearer {bridge.admin_token}"}
+    with TestClient(local.app, base_url="https://public.test", client=("203.0.113.9", 50000)) as remote:
+        response = remote.post("/api/browser-sync/session", headers=headers)
+        assert "Secure" in response.headers["set-cookie"]
+        cookie = remote.cookies.get(SESSION_COOKIE)
+        assert remote.get("/api/browser-sync/clients", headers={"Origin": "https://evil.test"}).status_code == 403
+        assert remote.delete("/api/browser-sync/session", headers={"sec-fetch-site": "cross-site"}).status_code == 403
+        assert remote.get("/api/browser-sync/clients", headers={"Host": "evil.test"}).status_code == 401
+        expires, nonce, signature = cookie.split(".")
+        for forged in (cookie[:-1] + ("0" if cookie[-1] != "0" else "1"), f"1.{nonce}.{signature}",
+                       f"{int(time.time()) + SESSION_SECONDS + 1000}.{nonce}.{signature}"):
+            assert remote.get("/api/browser-sync/clients", headers={"Cookie": f"{SESSION_COOKIE}={forged}"}).status_code == 401
+        bridge.admin_token = "rotated-admin-secret"
+        assert remote.get("/api/browser-sync/clients").status_code == 401
+
+
 def test_readback_numbers_accept_json_numeric_equivalence_but_not_boolean_coercion():
     from app.browser_sync import inputs_match
     assert inputs_match({"in_1": 1000, "in_4": False}, {"in_1": 1000.0, "in_4": False})
