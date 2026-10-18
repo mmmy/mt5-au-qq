@@ -36,6 +36,14 @@ python -m venv .venv
 python -m pip install -r requirements.txt
 ```
 
+Windows 上的上海时区数据由 `tzdata` 提供，已包含在依赖清单中。更新项目后，请用启动程序所用的 Python 重新运行 `python -m pip install -r requirements.txt`。如果启动时报 `No module named 'tzdata'` 或 `No time zone found with key Asia/Shanghai`，先在同一 Python 环境执行 `python -m pip install tzdata`，然后重启程序。`启动程序.cmd` 优先使用项目 `.venv`，其次使用 `py -3`，最后使用 `python`；安装依赖时也应使用对应解释器。
+
+可在项目目录执行以下命令检查依赖，检查过程不会启动服务：
+
+```powershell
+.\启动程序.cmd --check
+```
+
 确认项目根目录存在有效的 `.tv-cookie` 和 `payload.json`，然后启动：
 
 ```powershell

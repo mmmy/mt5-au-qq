@@ -25,7 +25,7 @@ echo [ERROR] Python was not found. Install Python and the project dependencies f
 goto failed
 
 :python_found
-%MT5_PYTHON% -c "import importlib.util, sys; names=('uvicorn','fastapi','httpx','dotenv','MetaTrader5'); missing=[name for name in names if importlib.util.find_spec(name) is None]; print('Missing dependencies: '+', '.join(missing)) if missing else None; sys.exit(bool(missing))"
+%MT5_PYTHON% -c "import importlib.util, sys; names=('uvicorn','fastapi','httpx','dotenv','MetaTrader5','tzdata'); missing=[name for name in names if importlib.util.find_spec(name) is None]; print('Missing dependencies: '+', '.join(missing)) if missing else None; sys.exit(bool(missing))"
 if errorlevel 1 (
     echo Install dependencies with:
     echo   %MT5_PYTHON% -m pip install -r requirements.txt
