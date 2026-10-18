@@ -117,6 +117,7 @@
     const selected = target();
     if (busy) { status("已有任务正在执行，请等待结果", true); return; }
     if (!selected) {
+      $("browserSync").open = true;
       $("browserSync").scrollIntoView({ behavior: "smooth", block: "center" });
       $("browserTarget").focus();
       status("请先选择已连接的浏览器，读取图表并明确选择目标", true);
@@ -150,8 +151,11 @@
       signal_settings: JSON.parse(JSON.stringify(signalSettings)) };
     confirmSync({ draft }, `来源：当前输入 ${draft.prices}；方向 ${draft.side}；有效 ${draft.valid_hours} 小时。开始时间按同步时当前 K 线计算。`);
   });
-  window.BrowserSync = { replay: (alert) => confirmSync({ alert_id: alert.alert_id },
-    `来源：警报 ${alert.alert_id} 创建时的完整策略快照。价格：${alert.prices?.join("、") || "由后端读取"}。保留原开始时间和有效期；历史警报可能已经到期。`) };
+  window.BrowserSync = { replay: (alert) => {
+    $("browserSync").open = true;
+    confirmSync({ alert_id: alert.alert_id },
+      `来源：警报 ${alert.alert_id} 创建时的完整策略快照。价格：${alert.prices?.join("、") || "由后端读取"}。保留原开始时间和有效期；历史警报可能已经到期。`);
+  } };
   $("discoverCharts").addEventListener("click", () => { autoDiscoveryClient = $("browserClient").value; run({ kind: "discover" }); });
   $("browserClient").addEventListener("change", () => {
     $("browserTarget").value = ""; rememberSelection(); renderTargets(); refresh();

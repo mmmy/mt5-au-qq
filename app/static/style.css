@@ -798,7 +798,8 @@ a:focus-visible, summary:focus-visible, select:focus-visible { outline: 2px soli
 .connection-setup .webhook-box:last-child { border: 0; }
 .manual-setup-help { margin: 0 0 8px; max-width: 70ch; line-height: 1.7; }
 .create-panel > .connection-setup { margin: 20px 0 0; border-top: 1px solid var(--border); border-bottom: 0; }
-.client-actions-popover {
+.client-actions-popover,
+.alert-actions-popover {
   position: fixed;
   inset: auto;
   margin: 0;
@@ -812,8 +813,10 @@ a:focus-visible, summary:focus-visible, select:focus-visible { outline: 2px soli
   text-align: left;
 }
 .client-actions-popover h3 { margin: 0 0 14px; font-size: 14px; }
+.alert-actions-popover { width: min(220px, calc(100vw - 24px)); padding: 8px; }
+.alert-actions-popover .button { width: 100%; justify-content: flex-start; min-height: 44px; }
 .client-manual-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.client-more-button[aria-expanded="true"] { color: var(--accent-hover); border-color: var(--accent); }
+.client-more-button[aria-expanded="true"], .alert-more-button[aria-expanded="true"] { color: var(--accent-hover); border-color: var(--accent); }
 .webhook-box code { overflow-wrap: anywhere; white-space: normal; font-size: 12px; }
 
 
@@ -874,9 +877,11 @@ a:focus-visible, summary:focus-visible, select:focus-visible { outline: 2px soli
   *, *::before, *::after { transition: none !important; scroll-behavior: auto !important; }
 }
 
-.browser-sync { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border); }
-.browser-sync h3 { margin: 0; font-size: 16px; }
-.browser-sync > .panel-heading { padding: 0; gap: 16px; margin-bottom: 12px; }
+.browser-sync { margin-top: 20px; border-top: 1px solid var(--border); }
+.browser-sync > summary { padding: 14px 0; min-height: 48px; cursor: pointer; font-size: 14px; }
+.browser-sync-summary { display: inline-flex; align-items: center; justify-content: space-between; gap: 12px; width: calc(100% - 22px); vertical-align: middle; }
+.browser-sync-summary #browserConnection { flex-shrink: 0; font-size: 12px; }
+.browser-sync-body { padding-top: 4px; }
 .browser-sync .form-help { line-height: 1.7; overflow-wrap: anywhere; }
 .browser-sync-controls { display: grid; grid-template-columns: minmax(170px, 1fr) auto; gap: 12px; align-items: end; }
 .browser-sync-controls label { display: block; margin-bottom: 6px; font-size: 13px; }

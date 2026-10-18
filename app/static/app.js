@@ -977,19 +977,43 @@ function renderAlerts(alerts) {
     parameterButton.textContent = "查看参数";
     parameterButton.setAttribute("aria-label", `查看警报 ${alert.alert_id} 创建时参数`);
     parameterButton.addEventListener("click", () => openAlertParameters(alert));
-    const syncButton = document.createElement("button");
-    syncButton.type = "button";
-    syncButton.className = "button button-secondary";
-    syncButton.textContent = "同步到图表";
-    syncButton.setAttribute("aria-label", `把警报 ${alert.alert_id} 的参数同步到图表`);
-    syncButton.addEventListener("click", () => window.BrowserSync?.replay(alert));
     const deleteButton = document.createElement("button");
     deleteButton.type = "button";
     deleteButton.className = "button button-danger";
     deleteButton.textContent = "删除";
     deleteButton.addEventListener("click", () => deleteAlert(alert, deleteButton));
     actions.append(parameterButton);
-    if (window.BrowserSync) actions.append(syncButton);
+    if (window.BrowserSync) {
+      const more = document.createElement("button");
+      more.type = "button";
+      more.className = "button button-secondary alert-more-button";
+      more.textContent = "更多";
+      more.setAttribute("aria-label", `警报 ${alert.alert_id} 更多操作`);
+      more.setAttribute("aria-expanded", "false");
+      const menu = document.createElement("div");
+      menu.id = `alert-actions-${alert.alert_id}`;
+      menu.className = "alert-actions-popover";
+      menu.setAttribute("popover", "auto");
+      menu.setAttribute("role", "region");
+      menu.setAttribute("aria-label", `警报 ${alert.alert_id} 更多操作`);
+      more.setAttribute("aria-controls", menu.id);
+      const syncButton = document.createElement("button");
+      syncButton.type = "button";
+      syncButton.className = "button button-secondary";
+      syncButton.textContent = "同步到图表";
+      syncButton.setAttribute("aria-label", `把警报 ${alert.alert_id} 的参数同步到图表`);
+      syncButton.addEventListener("click", () => { menu.hidePopover(); window.BrowserSync.replay(alert); });
+      menu.append(syncButton);
+      menu.addEventListener("toggle", () => more.setAttribute("aria-expanded", String(menu.matches(":popover-open"))));
+      more.addEventListener("click", () => {
+        if (menu.matches(":popover-open")) { menu.hidePopover(); return; }
+        menu.showPopover();
+        const rect = more.getBoundingClientRect();
+        menu.style.left = `${Math.max(12, Math.min(rect.right - menu.offsetWidth, window.innerWidth - menu.offsetWidth - 12))}px`;
+        menu.style.top = `${Math.max(12, Math.min(rect.bottom + 8, window.innerHeight - menu.offsetHeight - 12))}px`;
+      });
+      actions.append(more, menu);
+    }
     actions.append(deleteButton);
     actionCell.append(actions);
     row.append(actionCell);

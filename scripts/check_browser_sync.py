@@ -145,7 +145,10 @@ def run():
                     dashboard.on("pageerror", lambda error: errors.append(str(error)))
                     dashboard.goto(remote_base)
                     expect(dashboard.locator("#browserSync")).to_be_visible()
+                    assert not dashboard.locator("#browserSync").evaluate("el => el.open")
+                    expect(dashboard.locator("#discoverCharts")).to_be_hidden()
                     expect(dashboard.locator("#browserConnection")).to_contain_text("当前网页未授权")
+                    dashboard.locator("#browserSync > summary").click()
                     dashboard.locator("#browserAdminToken").fill(token)
                     dashboard.locator("#browserAuthorize").click()
                     expect(dashboard.locator("#browserConnection")).to_contain_text("1 个浏览器已连接", timeout=10000)
@@ -155,6 +158,7 @@ def run():
                     client_id = dashboard.locator("#browserClient").input_value()
                     for _ in range(3):
                         dashboard.reload()
+                        assert not dashboard.locator("#browserSync").evaluate("el => el.open")
                         expect(dashboard.locator("#browserConnection")).to_contain_text("1 个浏览器已连接")
                         expect(dashboard.locator("#browserClient")).to_have_value(client_id)
                         expect(dashboard.locator("#browserTarget")).to_have_value(selected)
@@ -171,6 +175,7 @@ def run():
                     expect(dashboard.locator("#browserTarget")).to_have_value(selected, timeout=20000)
                     assert len(app.state.browser_bridge.clients()) == 1
                     assert chart.evaluate("window.chartWrites") == 0
+                    dashboard.locator("#browserSync > summary").click()
                     dashboard.locator("#prices").fill("4600, 4620.5")
                     dashboard.locator("#syncDraft").click()
                     dashboard.get_by_role("button", name="同步并校验", exact=True).click()
@@ -179,7 +184,16 @@ def run():
                     assert chart.evaluate("window.chartInputs.in_8") == 4620.5
                     assert chart.evaluate("window.chartInputs.in_10") is False
                     assert chart.evaluate("window.chartInputs.in_11") == 0
+                    dashboard.locator("#browserSync > summary").click()
+                    expect(dashboard.get_by_role("button", name="把警报 7 的参数同步到图表")).to_be_hidden()
+                    more = dashboard.get_by_role("button", name="警报 7 更多操作", exact=True)
+                    more.click()
+                    expect(more).to_have_attribute("aria-expanded", "true")
+                    dashboard.keyboard.press("Escape")
+                    expect(more).to_have_attribute("aria-expanded", "false")
+                    more.click()
                     dashboard.get_by_role("button", name="把警报 7 的参数同步到图表").click()
+                    assert dashboard.locator("#browserSync").evaluate("el => el.open")
                     dashboard.get_by_role("button", name="同步并校验", exact=True).click()
                     expect(dashboard.locator("#browserSyncStatus")).to_contain_text("回读一致", timeout=15000)
                     assert chart.evaluate("window.chartInputs.in_5") == 4700
@@ -189,9 +203,19 @@ def run():
                     output = ROOT / "data/browser-sync-qa"
                     output.mkdir(parents=True, exist_ok=True)
                     dashboard.locator("#browserSync").screenshot(path=str(output / "desktop.png"))
+                    dashboard.locator("#browserSync > summary").click()
+                    dashboard.locator("#browserSync").screenshot(path=str(output / "desktop-collapsed.png"))
                     dashboard.set_viewport_size({"width": 390, "height": 844})
                     dashboard.locator("#browserSync").scroll_into_view_if_needed()
+                    dashboard.locator("#browserSync").screenshot(path=str(output / "mobile-collapsed.png"))
+                    dashboard.locator("#browserSync > summary").click()
                     dashboard.locator("#browserSync").screenshot(path=str(output / "mobile.png"))
+                    more.click()
+                    menu = dashboard.locator(".alert-actions-popover:popover-open")
+                    expect(menu).to_be_visible()
+                    bounds = menu.bounding_box()
+                    assert bounds["x"] >= 0 and bounds["x"] + bounds["width"] <= 390
+                    dashboard.keyboard.press("Escape")
                     assert dashboard.evaluate("document.documentElement.scrollWidth <= innerWidth"), "Mobile page overflows"
                     # A document navigation invalidates the captured instance, even if IDs repeat.
                     chart.reload()
@@ -199,7 +223,7 @@ def run():
                     dashboard.get_by_role("button", name="同步并校验", exact=True).click()
                     expect(dashboard.locator("#browserSyncStatus")).to_have_class("form-help sync-error", timeout=15000)
                     assert chart.evaluate("window.chartWrites") == 0
-                    print("PASS: remote-page authorization survives three reloads, page reopen and bridge restart without re-pairing; selected chart restored; real MV3/WS draft/replay readback and navigation guard")
+                    print("PASS: default collapsed preview retains connection/selection across refresh; accessible More popover on desktop/mobile; remote authorization, real MV3/WS draft/replay readback and navigation guard")
                     print("Screenshots:", output)
                 finally:
                     context.close()
