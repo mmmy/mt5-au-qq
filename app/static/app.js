@@ -76,8 +76,28 @@ function formatShanghaiDateTime(value) {
   }).format(date);
 }
 
+const statisticsDateStorageKey = "mt5-au-qq.statistics-dates.v1";
+
+function validateStatisticsDates(start, end) {
+  const validDate = (value) => {
+    if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value) || value.startsWith("0000")) return false;
+    const timestamp = Date.parse(`${value}T00:00:00Z`);
+    return Number.isFinite(timestamp) && new Date(timestamp).toISOString().slice(0, 10) === value;
+  };
+  return !validDate(start) || !validDate(end) ? "请选择开始和结束日期。"
+    : start > end ? "开始日期不能晚于结束日期。"
+      : end > isoDate(new Date()) ? "结束日期不能晚于今天。"
+        : (Date.parse(`${end}T00:00:00Z`) - Date.parse(`${start}T00:00:00Z`)) / 86_400_000 > 365
+          ? "统计范围不能超过 366 天。" : "";
+}
+
 function renderTradeStatistics(data) {
   appliedStatistics = { start: data.start_date, end: data.end_date, account: data.account || "" };
+  try {
+    localStorage.setItem(statisticsDateStorageKey, JSON.stringify(appliedStatistics));
+  } catch (_error) {
+    // Statistics must still work when browser storage is unavailable or full.
+  }
   document.querySelectorAll(".statistics-preset").forEach(button => {
     const today = isoDate(new Date());
     button.setAttribute("aria-pressed", String(data.end_date === today && data.start_date === shiftISODate(today, 1-Number(button.dataset.days))));
@@ -134,11 +154,7 @@ async function loadTradeStatistics({ useApplied = false, accountOnly = false } =
   const end = (useApplied || accountOnly) && appliedStatistics ? appliedStatistics.end : elements.statisticsEnd.value;
   const request = ++statisticsRequest;
   elements.statisticsError.hidden = true;
-  const validation = !start || !end ? "请选择开始和结束日期。"
-    : start > end ? "开始日期不能晚于结束日期。"
-      : end > isoDate(new Date()) ? "结束日期不能晚于今天。"
-        : (Date.parse(`${end}T00:00:00Z`) - Date.parse(`${start}T00:00:00Z`)) / 86_400_000 > 365
-          ? "统计范围不能超过 366 天。" : "";
+  const validation = validateStatisticsDates(start, end);
   if (validation) {
     elements.statisticsError.textContent = validation;
     elements.statisticsError.hidden = false;
@@ -164,6 +180,20 @@ function initializeTradeStatistics() {
   if (!elements.statisticsStart) return;
   const today = isoDate(new Date());
   elements.statisticsStart.value = shiftISODate(today, -6); elements.statisticsEnd.value = today;
+  try {
+    const saved = JSON.parse(localStorage.getItem(statisticsDateStorageKey));
+    if (saved && !validateStatisticsDates(saved.start, saved.end)) {
+      elements.statisticsStart.value = saved.start;
+      elements.statisticsEnd.value = saved.end;
+    }
+    if (saved && typeof saved.account === "string" && /^[A-Za-z0-9_-]{1,32}$/.test(saved.account)) {
+      // Keep the saved selection available until the current client list arrives.
+      elements.statisticsAccount.replaceChildren(new Option("全部客户端", ""), new Option(`客户端 ${saved.account}`, saved.account));
+      elements.statisticsAccount.value = saved.account;
+    }
+  } catch (_error) {
+    // Invalid or inaccessible storage falls back to the initial seven-day range.
+  }
   elements.statisticsStart.max = today; elements.statisticsEnd.max = today;
   elements.statisticsApply.addEventListener("click", loadTradeStatistics);
   elements.statisticsAccount.addEventListener("change", () => loadTradeStatistics({ accountOnly: true }));
@@ -183,6 +213,12 @@ function updateStatisticsAccounts(clients) {
   const options = [new Option("全部客户端", ""), ...clients.map((client) => new Option(`客户端 ${client.client_id}`, client.client_id))];
   elements.statisticsAccount.replaceChildren(...options);
   elements.statisticsAccount.value = clients.some((client) => client.client_id === selected) ? selected : "";
+  if (appliedStatistics?.account && !clients.some((client) => client.client_id === appliedStatistics.account)) {
+    appliedStatistics.account = "";
+  }
+  if (selected && !elements.statisticsAccount.value && !refreshingDashboard) {
+    loadTradeStatistics({ accountOnly: true });
+  }
 }
 const signalTypes = [
   ["fractal", "分型"],
@@ -1124,8 +1160,10 @@ async function refreshDashboard() {
   elements.refreshButton.disabled = true;
   elements.refreshButton.textContent = "刷新中……";
   try {
-    await Promise.all([loadAlerts({ quiet: true }), loadTradingStatus(), loadTradingViewSetup(), loadSignals(),
-      signalDialog.open ? Promise.resolve() : loadSignalSettings(), loadTradeStatistics({ useApplied: true })]);
+    const tradingStatus = loadTradingStatus();
+    await Promise.all([loadAlerts({ quiet: true }), tradingStatus, loadTradingViewSetup(), loadSignals(),
+      signalDialog.open ? Promise.resolve() : loadSignalSettings(),
+      tradingStatus.then(() => loadTradeStatistics({ useApplied: true }))]);
   } finally {
     refreshingDashboard = false;
     elements.refreshButton.disabled = false;
