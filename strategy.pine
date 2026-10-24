@@ -324,13 +324,14 @@ slSell = not isLongBar and not isLongBar[1] and not isLongBar[2] and sl
 slBuy = isLongBar and isLongBar[1] and isLongBar[2] and sl
 
 slSellMatchPrice = slSell and open < longPrice
-slBuyMatchPrice = slBuy and open < shortPrice
+slBuyMatchPrice = slBuy and open > shortPrice
 bsSlSellMatchPrice = ta.barssince(slSellMatchPrice)
 bsSlBuyMatchPrice = ta.barssince(slBuyMatchPrice)
 
 // [1] 取上一根已收盘5分钟K线的值；配合 lookahead_on，避免当前未收盘数据重绘和历史前视。
-[bsSlSellMatchPrice_5m, bsSlBuyMatchPrice_5m] = request.security(syminfo.tickerid, '5', [bsSlSellMatchPrice[1], bsSlBuyMatchPrice[1]], lookahead = barmerge.lookahead_on)
-
+[slSellMatchPrice_5m, slBuyMatchPrice_5m, bsSlSellMatchPrice_5m, bsSlBuyMatchPrice_5m] = request.security(syminfo.tickerid, '5', [slSellMatchPrice, slBuyMatchPrice, bsSlSellMatchPrice[1], bsSlBuyMatchPrice[1]], lookahead = barmerge.lookahead_on)
+// bgcolor(slSellMatchPrice_5m ? color.new(color.white, 70) : na)
+// bgcolor(slBuyMatchPrice_5m ? color.new(color.blue, 70) : na)
 
 // plot(longPrice > 0 ? longPrice : na, color=color.green)
 // plot(shortPrice > 0 ? shortPrice : na, color=color.red)
