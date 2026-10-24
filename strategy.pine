@@ -318,6 +318,20 @@ sp1 = plot(shortPriceMin, display = display.none)
 sp2 = plot(shortPriceMax, display = display.none)
 fill(sp1, sp2, color=color.new(color.red, 80))
 
+// 缩量
+sl = bodyHight < bodyHight[1] and bodyHight[1] < bodyHight[2]
+slSell = not isLongBar and not isLongBar[1] and not isLongBar[2] and sl
+slBuy = isLongBar and isLongBar[1] and isLongBar[2] and sl
+
+slSellMatchPrice = slSell and open < longPrice
+slBuyMatchPrice = slBuy and open < shortPrice
+bsSlSellMatchPrice = ta.barssince(slSellMatchPrice)
+bsSlBuyMatchPrice = ta.barssince(slBuyMatchPrice)
+
+// 只读取上一根已收盘5分钟K线的缩量计数，避免未收盘数据重绘。
+[bsSlSellMatchPrice_5m, bsSlBuyMatchPrice_5m] = request.security(syminfo.tickerid, '5', [bsSlSellMatchPrice[1], bsSlBuyMatchPrice[1]], lookahead = barmerge.lookahead_on)
+
+
 // plot(longPrice > 0 ? longPrice : na, color=color.green)
 // plot(shortPrice > 0 ? shortPrice : na, color=color.red)
 
@@ -450,13 +464,15 @@ else if enableTunmo and tumoShort
 // 生成信号,5m与2m共振
 long_5m = isInLongPirce_5m and ((enableFractal_5m and fractalBottom_5m) or (enablePinbar_5m and pinbarUp_5m) or (enablePinbarMore_5m and pinbarMore_5m) or (enableInsideBar_5m and bullishInsideBar_5m) or (enableTunmo_5m and tumoLong_5m))
 bsLong_5m = ta.barssince(long_5m)
-long_1m = isInLongPirce and (fractalBottomSignal or pinbarUpSignal or pinbarMoreSignal or bullishInsideBarSignal or tumoLongSignal)
-longSignal = longSideOn and bsLong_5m <= 3 and long_1m
+long_2m = isInLongPirce and (fractalBottomSignal or pinbarUpSignal or pinbarMoreSignal or bullishInsideBarSignal or tumoLongSignal)
+// 5分钟最近有缩量,且 5分钟和2分钟共振
+longSignal = longSideOn and bsSlSellMatchPrice_5m < 10 and bsLong_5m <= 3 and long_2m
 
 short_5m = isInShortPrice_5m and ((enableFractal_5m and fractalTop_5m) or (enablePinbar_5m and pinbarDown_5m) or (enablePinbarMore_5m and pinbarMore_5m) or (enableInsideBar_5m and bearishInsideBar_5m) or (enableTunmo_5m and tumoShort_5m))
-short_1m = isInShortPrice and (fractalTopSignal or pinbarDownSignal or pinbarMoreSignal or bearishInsideBarSignal or tumoShortSignal)
+short_2m = isInShortPrice and (fractalTopSignal or pinbarDownSignal or pinbarMoreSignal or bearishInsideBarSignal or tumoShortSignal)
 bsShort_5m = ta.barssince(short_5m)
-shortSignal = shortSideOn and bsShort_5m <= 3 and short_1m
+// 5分钟最近有缩量,且 5分钟和2分钟共振
+shortSignal = shortSideOn and bsSlBuyMatchPrice_5m < 10 and bsShort_5m <= 3 and short_2m
 
 // 与 barssince 使用同一个有效信号，保存最近一次5分钟信号的形态。
 var string lastLong5mMsg = na
