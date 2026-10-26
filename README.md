@@ -71,10 +71,12 @@ Windows 上的上海时区数据由 `tzdata` 提供，已包含在依赖清单�
 确认项目根目录存在有效的 `.tv-cookie` 和 `payload.json`，然后启动：
 
 ```powershell
-python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --loop asyncio:SelectorEventLoop
 ```
 
 浏览器打开 <http://127.0.0.1:8000>。API 文档位于 <http://127.0.0.1:8000/docs>。
+
+Windows 启动时明确使用 `SelectorEventLoop`，避免默认 `ProactorEventLoop` 在接收连接遇到 `WinError 64` 时关闭监听端口、但 Python 进程仍然存活的问题。此启动参数需要 Uvicorn 0.36 或更新版本；`启动程序.cmd --check` 也会检查这项要求。MT5 使用的独立进程通过 `multiprocessing` 通信，不依赖 asyncio 子进程接口。Windows 的 Selector 循环最多支持 512 个 socket，适合当前管理页面和 webhook 的连接规模。
 
 不要使用多个 Uvicorn worker。每个 MT5 客户端的操作在独立进程中串行执行，两个客户端可以独立处理信号。首次运行默认停止交易；在页面手动切换后，开关状态会保存到 SQLite 并在后续重启时恢复。
 

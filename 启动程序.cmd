@@ -31,6 +31,12 @@ if errorlevel 1 (
     echo   %MT5_PYTHON% -m pip install -r requirements.txt
     goto failed
 )
+%MT5_PYTHON% -c "import sys, uvicorn; sys.exit(0 if hasattr(uvicorn.Config, 'get_loop_factory') else 'Uvicorn >= 0.36 is required for the Windows event loop setting.')"
+if errorlevel 1 (
+    echo Upgrade dependencies with:
+    echo   %MT5_PYTHON% -m pip install -r requirements.txt
+    goto failed
+)
 if /i "%~1"=="--check" (
     echo [OK] Python and dependencies are available. No server was started.
     exit /b 0
@@ -44,7 +50,8 @@ echo MT5 AU QQ is starting on %MT5_APP_HOST%:%MT5_APP_PORT%.
 echo Close this window to stop the backend. Ctrl+C performs a graceful stop.
 echo Existing positions and MT5 terminal windows are not closed automatically.
 echo.
-%MT5_PYTHON% -m uvicorn app.main:app --host "%MT5_APP_HOST%" --port "%MT5_APP_PORT%"
+rem Proactor accept errors can close the listener while leaving Python running.
+%MT5_PYTHON% -m uvicorn app.main:app --host "%MT5_APP_HOST%" --port "%MT5_APP_PORT%" --loop asyncio:SelectorEventLoop
 if errorlevel 1 goto failed
 exit /b 0
 
