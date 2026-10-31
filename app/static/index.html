@@ -58,8 +58,15 @@
             <tbody id="mt5Clients"><tr><td colspan="9">正在读取客户端……</td></tr></tbody>
           </table>
         </div>
-
-
+        <form id="emergencyStopForm" class="emergency-stop-form">
+          <label for="emergencyStopDistance">兜底止损距离 <span class="form-help">所有客户端共用</span></label>
+          <div class="emergency-stop-controls">
+            <input id="emergencyStopDistance" type="number" min="0" step="any" value="4" required disabled aria-describedby="emergencyStopHelp emergencyStopFeedback">
+            <button id="saveEmergencyStop" class="button button-secondary" type="submit" disabled>保存</button>
+          </div>
+          <p id="emergencyStopHelp" class="form-help">按品种价格差计算，默认 4，0 表示关闭。保存后用于后续开仓和反手，已有持仓不变。</p>
+          <p id="emergencyStopFeedback" class="emergency-stop-feedback" role="status" aria-live="polite">正在读取设置……</p>
+        </form>
       </section>
 
       <section class="panel create-panel" aria-labelledby="createTitle">

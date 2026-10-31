@@ -765,9 +765,64 @@ function renderMt5Clients(clients) {
   }
 }
 
+const emergencyStopForm = document.getElementById("emergencyStopForm");
+const emergencyStopInput = document.getElementById("emergencyStopDistance");
+const saveEmergencyStop = document.getElementById("saveEmergencyStop");
+const emergencyStopFeedback = document.getElementById("emergencyStopFeedback");
+let savedEmergencyStop = null;
+let savingEmergencyStop = false;
+
+emergencyStopInput.addEventListener("input", () => {
+  emergencyStopForm.dataset.dirty = String(emergencyStopInput.value !== String(savedEmergencyStop));
+  emergencyStopFeedback.textContent = emergencyStopForm.dataset.dirty === "true" ? "尚未保存" : "";
+  emergencyStopFeedback.classList.remove("bad", "good");
+});
+emergencyStopForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (savingEmergencyStop || !emergencyStopForm.reportValidity()) return;
+  const distance = emergencyStopInput.valueAsNumber;
+  if (!Number.isFinite(distance) || distance < 0) {
+    emergencyStopFeedback.textContent = "请输入大于或等于 0 的有限数值";
+    emergencyStopFeedback.classList.add("bad");
+    emergencyStopInput.focus();
+    return;
+  }
+  savingEmergencyStop = true;
+  emergencyStopInput.disabled = saveEmergencyStop.disabled = true;
+  saveEmergencyStop.textContent = "保存中……";
+  emergencyStopFeedback.textContent = "";
+  emergencyStopFeedback.classList.remove("bad", "good");
+  try {
+    const result = await apiRequest("/api/trading/emergency-stop", {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ emergency_sl_distance: distance }),
+    });
+    savedEmergencyStop = result.emergency_sl_distance;
+    emergencyStopInput.value = savedEmergencyStop;
+    emergencyStopForm.dataset.dirty = "false";
+    emergencyStopFeedback.textContent = result.message;
+    emergencyStopFeedback.classList.add("good");
+  } catch (error) {
+    emergencyStopForm.dataset.dirty = "true";
+    emergencyStopFeedback.textContent = `未保存：${error.message}`;
+    emergencyStopFeedback.classList.add("bad");
+  } finally {
+    savingEmergencyStop = false;
+    emergencyStopInput.disabled = saveEmergencyStop.disabled = false;
+    saveEmergencyStop.textContent = "保存";
+  }
+});
+
 async function loadTradingStatus() {
   try {
     const data = await apiRequest("/api/trading/status");
+    if (!savingEmergencyStop && emergencyStopForm.dataset.dirty !== "true" &&
+        !emergencyStopForm.contains(document.activeElement)) {
+      emergencyStopInput.value = data.emergency_sl_distance;
+      emergencyStopInput.disabled = saveEmergencyStop.disabled = false;
+      if (savedEmergencyStop === null) emergencyStopFeedback.textContent = "";
+      savedEmergencyStop = data.emergency_sl_distance;
+    }
     // Older single-client responses still use the same compact row.
     const clients = data.clients?.length ? data.clients : [
       { client_id: "A", enabled: data.enabled, volume: data.volume, max_volume: data.max_volume, mt5: data.mt5 },

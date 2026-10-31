@@ -124,7 +124,7 @@ def test_open_repeat_and_strategy_stop_loss(webhook_app, direction, position_typ
     post_and_wait(client, opening, "open_" + direction)
     position = terminal.owned()[0]
     assert position.type == position_type and position.volume == 0.01
-    assert position.sl == (4580.2 if direction == "long" else 4620.0)
+    assert position.sl == (4596.2 if direction == "long" else 4604.0)
     assert client.post("/api/webhooks/tradingview", json=opening).json()["duplicate"] is True
     assert len(terminal.requests) == 1
     post_and_wait(client, tv_payload(current=direction), "open_" + direction)
@@ -175,9 +175,58 @@ def test_broker_stop_loss_then_tv_stop_does_not_reopen(webhook_app, direction):
 
 def test_emergency_stop_can_be_disabled(webhook_app):
     client, terminal = webhook_app
-    client.app.state.trading_service.workers["A"].gateway.emergency_sl_distance = 0
+    assert client.put("/api/trading/emergency-stop", json={"emergency_sl_distance": 0}).status_code == 200
     post_and_wait(client, tv_payload(), "open_long")
     assert "sl" not in terminal.requests[-1]
+
+
+def test_saved_emergency_stop_updates_next_open_and_reversal_only(webhook_app):
+    client, terminal = webhook_app
+    assert client.get("/api/trading/status").json()["emergency_sl_distance"] == 4
+    post_and_wait(client, tv_payload(), "open_long")
+    position = terminal.owned()[0]
+    assert position.sl == 4596.2
+    response = client.put("/api/trading/emergency-stop", json={"emergency_sl_distance": 2.5})
+    assert response.status_code == 200
+    assert client.get("/api/trading/status").json()["emergency_sl_distance"] == 2.5
+    assert position.sl == 4596.2  # Saving never changes an existing position.
+    post_and_wait(client, tv_payload("long", "short"), "reverse_to_short")
+    assert terminal.owned()[0].sl == 4602.5
+    assert "sl" not in terminal.requests[-2]  # Closing retains its existing semantics.
+    assert client.put("/api/trading/emergency-stop", json={"emergency_sl_distance": 1.25}).status_code == 200
+    post_and_wait(client, tv_payload("short", "flat"), "close_short")
+    response = client.post("/api/mt5/actions/open_long?client_id=A")
+    assert response.status_code == 202
+    deadline = time.monotonic() + 3
+    while not terminal.owned() and time.monotonic() < deadline:
+        time.sleep(0.01)
+    assert terminal.owned()[0].sl == 4598.95
+
+
+@pytest.mark.parametrize("value", [-1, "4", True, None])
+def test_invalid_emergency_stop_keeps_saved_value(webhook_app, value):
+    client, terminal = webhook_app
+    assert client.put("/api/trading/emergency-stop", json={"emergency_sl_distance": value}).status_code == 422
+    assert client.get("/api/trading/status").json()["emergency_sl_distance"] == 4
+    assert not terminal.requests
+
+
+def test_nonfinite_emergency_stop_is_rejected(webhook_app):
+    client, terminal = webhook_app
+    for value in ("1e999", "-1e999"):
+        response = client.put("/api/trading/emergency-stop", content='{"emergency_sl_distance":' + value + '}',
+                              headers={"Content-Type": "application/json"})
+        assert response.status_code == 422
+    assert client.get("/api/trading/status").json()["emergency_sl_distance"] == 4
+    assert not terminal.requests
+
+
+def test_invalid_broker_stop_does_not_retry_without_sl(webhook_app, monkeypatch):
+    client, terminal = webhook_app
+    monkeypatch.setattr(terminal, "order_check", lambda request:
+                        SimpleNamespace(retcode=real_mt5.TRADE_RETCODE_INVALID_STOPS, comment="Invalid stops"))
+    post_and_wait(client, tv_payload(), "open_long", status="failed")
+    assert not terminal.requests and not terminal.owned()
 
 
 def test_failed_close_keeps_position_and_reports_failure(webhook_app):

@@ -207,6 +207,16 @@ class ClientVolumeResponse(BaseModel):
     message: str
 
 
+class EmergencyStopRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    emergency_sl_distance: float = Field(ge=0, strict=True, allow_inf_nan=False)
+
+
+class EmergencyStopResponse(EmergencyStopRequest):
+    message: str
+
+
 class TradingRuntimeStatus(BaseModel):
     enabled: bool
     webhook_url: str

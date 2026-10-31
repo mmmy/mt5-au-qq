@@ -12,7 +12,7 @@ from app.models import (ClientRuntimeStatus, ClientVolumeRequest, ClientVolumeRe
 from app.mt5_process import ProcessMt5Gateway
 from app.trade_repository import TRADING_TIMEZONE
 from app.trading_service import (MANUAL_ACTIONS, TRADING_ENABLED_SETTING, Mt5Worker,
-                                 TradingService, derive_trade_action, webhook_signal_id)
+                                 TradingService, derive_trade_action, emergency_stop_distance, webhook_signal_id)
 
 
 class MultiTradingService(TradingService):
@@ -77,7 +77,7 @@ class MultiTradingService(TradingService):
             volume=self.client_volume(key), mt5=status)
             for (key, config), status in zip(self.configs.items(), statuses)]
         return TradingRuntimeStatus(enabled=self.is_enabled(), webhook_url=webhook_url or self.webhook_url or "",
-            volume=clients[0].volume, emergency_sl_distance=self.emergency_sl_distance,
+            volume=clients[0].volume, emergency_sl_distance=emergency_stop_distance(self.repository),
             demo_only=self.demo_only, mt5=statuses[0], clients=clients)
 
     async def trade_statistics(self, start_date: str, end_date: str, account: str | None = None):

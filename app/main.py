@@ -22,6 +22,8 @@ from app.models import (
     CreateAlertRequest,
     CreateAlertResponse,
     DeleteAlertResponse,
+    EmergencyStopRequest,
+    EmergencyStopResponse,
     HealthResponse,
     ManualActionResponse,
     OrderItem,
@@ -173,6 +175,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def trading_status(request: Request) -> TradingRuntimeStatus:
         webhook_url = resolve_webhook_url(request, request.app.state.settings.local_webhook_url)
         return await request.app.state.trading_service.runtime_status(webhook_url=webhook_url)
+
+    @app.put("/api/trading/emergency-stop", response_model=EmergencyStopResponse)
+    async def set_emergency_stop(data: EmergencyStopRequest, request: Request) -> EmergencyStopResponse:
+        return request.app.state.trading_service.set_emergency_stop(data.emergency_sl_distance)
 
     @app.put("/api/trading/clients/{client_id}/volume", response_model=ClientVolumeResponse)
     async def set_client_volume(client_id: str, data: ClientVolumeRequest, request: Request) -> ClientVolumeResponse:

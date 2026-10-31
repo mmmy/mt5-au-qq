@@ -23,6 +23,7 @@ class SimulatedGateway:
     def __init__(self, **options):
         self.symbol = options["symbol"]
         self.volume = options["volume"]
+        self.emergency_sl_distance = options.get("emergency_sl_distance", 4)
         self.count = 0
 
     def status(self):
@@ -31,15 +32,18 @@ class SimulatedGateway:
             symbol=self.symbol, symbol_available=True, server=str(os.getpid()),
             owned_long_positions=self.count, volume_min=0.01, volume_max=10, volume_step=0.01)
 
-    def execute(self, action, *, volume=None):
+    def execute(self, action, *, volume=None, emergency_sl_distance=None):
         if volume is not None:
             self.volume = volume
+        if emergency_sl_distance is not None:
+            self.emergency_sl_distance = emergency_sl_distance
         if self.symbol == "FAIL":
             raise RuntimeError("模拟下单失败")
         if self.symbol == "SLOW":
             time.sleep(0.3)
         self.count += 1
-        return [ExecutedOrder(action.value, self.count, self.symbol, self.volume, 4600, 10009, "simulated")]
+        return [ExecutedOrder(action.value, self.count, self.symbol, self.volume, 4600, 10009,
+                              f"simulated sl={self.emergency_sl_distance:g}")]
 
     def history_deals(self, start, end):
         return {"currency": "AUD", "deals": []}
@@ -246,6 +250,43 @@ def test_recovery_does_not_retry_running_or_removed_clients(tmp_path):
     assert repo.get_signal("pending:B")["status"] == "blocked"
 
 
+def test_emergency_stop_shared_persisted_and_restored_in_spawned_children(tmp_path):
+    repo = TradeRepository(tmp_path / "stops.db")
+    factory = lambda c: ProcessMt5Gateway(c, gateway_factory=SimulatedGateway)
+    service = MultiTradingService(repo, settings(), gateway_factory=factory)
+    service.start()
+    try:
+        assert asyncio.run(service.runtime_status()).emergency_sl_distance == 4
+        asyncio.run(service.toggle_client("A", True))
+        asyncio.run(service.toggle_client("B", True))
+        first = service.ingest_webhook(webhook())
+        assert wait_completed(repo, first.signal_id)["status"] == "success"
+        assert {o.message for o in repo.list_orders()} == {"simulated sl=4"}
+        service.set_emergency_stop(2.75)
+        for invalid in (-1, float("inf"), float("nan")):
+            with pytest.raises(Exception, match="止损"):
+                service.set_emergency_stop(invalid)
+        second = service.ingest_webhook(webhook().model_copy(update={
+            "prev_market_position": "long", "market_position": "short", "order_id": "reverse",
+        }))
+        assert wait_completed(repo, second.signal_id)["status"] == "success"
+        assert {o.message for o in repo.list_orders() if o.action == "reverse_to_short"} == {"simulated sl=2.75"}
+    finally:
+        service.stop()
+    restored = MultiTradingService(repo, settings(), gateway_factory=factory)
+    restored.start()
+    try:
+        assert asyncio.run(restored.runtime_status()).emergency_sl_distance == 2.75
+        for key in restored.workers:
+            restored.workers[key].gateway.shutdown()
+        result = restored.ingest_webhook(webhook().model_copy(update={"order_id": "after-restart"}))
+        assert wait_completed(repo, result.signal_id)["status"] == "success"
+        orders = [o for o in repo.list_orders() if o.signal_id.startswith(result.signal_id)]
+        assert len(orders) == 2 and {o.message for o in orders} == {"simulated sl=2.75"}
+    finally:
+        restored.stop()
+
+
 def test_configuration_legacy_and_shared_parameters(monkeypatch):
     monkeypatch.setattr("app.config.load_dotenv", lambda *args, **kwargs: None)
     for name in list(os.environ):
@@ -271,7 +312,7 @@ def test_configuration_legacy_and_shared_parameters(monkeypatch):
         assert client.max_volume == 0.2
         assert client.magic == 789
         assert client.deviation == 30
-        assert client.emergency_sl_distance == 15
+        assert client.emergency_sl_distance == 4
         assert client.demo_only is True
         assert client.expected_login is None and client.expected_server is None
     monkeypatch.setenv("MT5_B_TERMINAL_PATH", "C:/A/terminal64.exe")

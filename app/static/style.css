@@ -241,6 +241,19 @@ h2 {
 .client-volume-feedback:empty { display: none; }
 .client-volume-feedback.bad { color: var(--danger); }
 
+.emergency-stop-form { display: grid; gap: 8px; margin: 18px 24px 0; padding-top: 18px; border-top: 1px solid var(--border); }
+.emergency-stop-form label { font-size: 14px; font-weight: 600; }
+.emergency-stop-form label .form-help { margin-left: 8px; font-weight: 400; }
+.emergency-stop-controls { display: flex; gap: 8px; align-items: center; }
+.emergency-stop-controls input { width: 100px; min-height: 44px; padding: 0 10px; border: 1px solid var(--border); border-radius: 7px; background: var(--panel); color: var(--text); font-size: 16px; }
+.emergency-stop-controls input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.emergency-stop-controls .button { min-height: 44px; }
+.emergency-stop-form p { margin: 0; }
+.emergency-stop-feedback { font-size: 13px; color: var(--muted); }
+.emergency-stop-feedback:empty { display: none; }
+.emergency-stop-feedback.good { color: var(--success); }
+.emergency-stop-feedback.bad { color: var(--danger); }
+
 .client-account {
   max-width: 240px;
   overflow: hidden;
@@ -859,7 +872,7 @@ a:focus-visible, summary:focus-visible, select:focus-visible { outline: 2px soli
   .header-actions { justify-content: space-between; }
   .page-header .button { width: auto; }
   .panel-heading, .create-panel { padding: 18px; }
-  .client-table-wrap, .execution-status, .connection-setup { margin-left: 18px; margin-right: 18px; }
+  .client-table-wrap, .execution-status, .connection-setup, .emergency-stop-form { margin-left: 18px; margin-right: 18px; }
   .client-table tr { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 6px; }
   .client-table td:nth-child(3), .client-table td:nth-child(5) { grid-column: 1 / -1; }
   .client-account { overflow-wrap: anywhere; }

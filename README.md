@@ -113,7 +113,6 @@ Copy-Item .env.example .env
 | `MT5_VOLUME` | `0.01` | 各账户尚未保存配置时使用的默认开仓手数 |
 | `MT5_MAGIC` | `26082301` | 本程序仓位标识 |
 | `MT5_DEVIATION` | `20` | 下单允许偏差点数 |
-| `MT5_EMERGENCY_SL_DISTANCE` | `20` | 券商端灾难保护止损价格距离，0 表示关闭 |
 | `MT5_DEMO_ONLY` | `false` | 是否只允许 MT5 技术类型为 Demo 的账户；Prop Firm 模拟资金账户如被标记为 Contest/Real，设为 `true` 后也会被拒绝 |
 | `SIGNAL_MAX_AGE_SECONDS` | `180` | webhook 信号最大有效秒数 |
 | `TRADING_ENABLED_AT_START` | `false` | 各客户端尚无已保存开关状态时的首次默认值 |
@@ -139,7 +138,9 @@ MT5_DEMO_ONLY=false
 
 支持直接粘贴 Windows“复制文件地址”得到的带双引号路径，也支持单引号、不加引号或正斜杠 `C:/MT5-A/terminal64.exe`。程序会自动恢复 `.env` 双引号解析产生的路径转义（例如 `\terminal64.exe` 中的 `\t`），无需手动更改斜杠或引号。此兼容处理同时适用于 `MT5_TERMINAL_PATH`、`MT5_A_TERMINAL_PATH` 和 `MT5_B_TERMINAL_PATH`。
 
-两个路径均留空时继续使用原来的 `MT5_TERMINAL_PATH`（或自动检测）。仅填写 A 时使用一个明确指定的客户端；填写 B 时必须同时填写 A，且两个路径不能相同。程序路径按客户端区分，品种、默认手数、magic、允许偏差、止损距离和模拟账户限制共用 `MT5_*` 配置；不读取 `MT5_A_VOLUME`、`MT5_B_SYMBOL` 等客户端专属环境变量。修改 `.env` 后需要重启服务。前端单独保存的账户手数优先于 `MT5_VOLUME`。
+两个路径均留空时继续使用原来的 `MT5_TERMINAL_PATH`（或自动检测）。仅填写 A 时使用一个明确指定的客户端；填写 B 时必须同时填写 A，且两个路径不能相同。程序路径按客户端区分，品种、默认手数、magic、允许偏差和模拟账户限制共用 `MT5_*` 配置；不读取 `MT5_A_VOLUME`、`MT5_B_SYMBOL` 等客户端专属环境变量。修改 `.env` 后需要重启服务。前端单独保存的账户手数优先于 `MT5_VOLUME`。
+
+“MT5 交易控制”中的“兜底止损距离”由所有客户端共用，默认 **4**，按品种价格差计算（例如买入参考价 2700、距离 4，则提交 SL 2696），不是账户亏损金额。支持非负有限小数，0 表示关闭。点击保存后写入 SQLite，刷新或重启后保留，无需重启服务或重建 TradingView 警报。每次 Webhook、手动开仓或反手都会读取最新值，随开仓订单提交券商端 SL；已有持仓不自动修改。原 `MT5_EMERGENCY_SL_DISTANCE` 环境变量不再读取。券商拒绝止损参数时订单失败，不会取消止损重试；实际成交仍可能受滑点影响。
 
 `MT5_SYMBOL` 同时用于校验 TradingView 信号品种和指定两个终端实际交易的品种，因此两个终端都需要提供相同名称的交易品种。
 

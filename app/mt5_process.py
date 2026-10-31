@@ -23,9 +23,11 @@ def _serve(connection, config: Mt5ClientConfig, gateway_factory=Mt5Gateway) -> N
                 if operation == "status":
                     result = gateway.status()
                 elif operation == "execute":
-                    action, volume = argument
+                    action, volume, emergency_sl_distance = argument
                     if volume is not None:
                         gateway.volume = volume
+                    if emergency_sl_distance is not None:
+                        gateway.emergency_sl_distance = emergency_sl_distance
                     result = gateway.execute(action)
                 elif operation == "history_deals":
                     start, end = argument
@@ -88,8 +90,8 @@ class ProcessMt5Gateway:
     def status(self):
         return self._call("status")
 
-    def execute(self, action, *, volume=None):
-        return self._call("execute", (action, volume))
+    def execute(self, action, *, volume=None, emergency_sl_distance=None):
+        return self._call("execute", (action, volume, emergency_sl_distance))
 
     def history_deals(self, start, end):
         return self._call("history_deals", (start.timestamp(), end.timestamp()))

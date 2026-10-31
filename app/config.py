@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_MT5_TERMINAL = Path(r"D:\Program Files\MetaTrader 5\terminal64.exe")
+DEFAULT_EMERGENCY_SL_DISTANCE = 4.0
 
 
 def _terminal_path(raw: str | None) -> Path | None:
@@ -100,7 +101,8 @@ class Settings:
             mt5_max_volume=float(os.getenv("MT5_MAX_VOLUME", "0.10")),
             mt5_magic=int(os.getenv("MT5_MAGIC", "26082301")),
             mt5_deviation=int(os.getenv("MT5_DEVIATION", "20")),
-            mt5_emergency_sl_distance=float(os.getenv("MT5_EMERGENCY_SL_DISTANCE", "20")),
+            # Runtime stop distance is managed on the page, never by environment.
+            mt5_emergency_sl_distance=DEFAULT_EMERGENCY_SL_DISTANCE,
             mt5_demo_only=_env_bool("MT5_DEMO_ONLY", False),
             signal_max_age_seconds=int(os.getenv("SIGNAL_MAX_AGE_SECONDS", "180")),
             trading_enabled_at_start=_env_bool("TRADING_ENABLED_AT_START", False),

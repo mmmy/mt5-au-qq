@@ -13,10 +13,13 @@ from datetime import datetime, timezone
 from typing import Any, Callable
 from uuid import uuid4
 
+from app.config import DEFAULT_EMERGENCY_SL_DISTANCE
 from app.errors import Mt5NotReadyError, TradingDisabledError, ValidationError
 from app.models import (
     ManualActionResponse,
     ClientVolumeRequest,
+    EmergencyStopRequest,
+    EmergencyStopResponse,
     Mt5Status,
     TradeAction,
     TradingRuntimeStatus,
@@ -43,6 +46,14 @@ MANUAL_ACTIONS = {
     TradeAction.CLOSE_SHORT,
 }
 TRADING_ENABLED_SETTING = "trading_enabled"
+EMERGENCY_SL_SETTING = "mt5_emergency_sl_distance"
+
+
+def emergency_stop_distance(repository: TradeRepository) -> float:
+    saved = repository.get_runtime_setting(EMERGENCY_SL_SETTING)
+    return EmergencyStopRequest(emergency_sl_distance=(
+        float(saved) if saved is not None else DEFAULT_EMERGENCY_SL_DISTANCE
+    )).emergency_sl_distance
 
 
 def derive_trade_action(previous: str, current: str) -> TradeAction:
@@ -181,16 +192,19 @@ class Mt5Worker:
             # Read immediately before execution so queued webhooks and recovered tasks
             # use the account's persisted volume, including after a child respawns.
             saved_volume = self.repository.get_runtime_setting(f"mt5_volume_{self.client_id}")
-            if saved_volume is not None and action in {
+            if action in {
                 TradeAction.OPEN_LONG, TradeAction.OPEN_SHORT,
                 TradeAction.REVERSE_TO_LONG, TradeAction.REVERSE_TO_SHORT,
             }:
-                volume = ClientVolumeRequest(volume=float(saved_volume)).volume
+                volume = ClientVolumeRequest(volume=float(saved_volume)).volume if saved_volume is not None else None
+                distance = emergency_stop_distance(self.repository)
                 if isinstance(self.gateway, Mt5Gateway):
-                    self.gateway.volume = volume
+                    if volume is not None:
+                        self.gateway.volume = volume
+                    self.gateway.emergency_sl_distance = distance
                     orders = self.gateway.execute(action)
                 else:
-                    orders = self.gateway.execute(action, volume=volume)
+                    orders = self.gateway.execute(action, volume=volume, emergency_sl_distance=distance)
             else:
                 orders = self.gateway.execute(action)
             for order in orders:
@@ -280,10 +294,18 @@ class TradingService:
             enabled=self.is_enabled(),
             webhook_url=webhook_url or self.webhook_url or "",
             volume=self.volume,
-            emergency_sl_distance=self.emergency_sl_distance,
+            emergency_sl_distance=emergency_stop_distance(self.repository),
             demo_only=self.demo_only,
             mt5=mt5_status,
         )
+
+    def set_emergency_stop(self, distance: float) -> EmergencyStopResponse:
+        if not math.isfinite(distance) or distance < 0:
+            raise ValidationError("兜底止损距离必须是大于或等于 0 的有限数值")
+        self.repository.set_runtime_setting(EMERGENCY_SL_SETTING, str(distance))
+        return EmergencyStopResponse(emergency_sl_distance=distance,
+            message=(f"兜底止损距离已保存为 {distance:g}，用于所有客户端后续开仓和反手；已有持仓不变"
+                     if distance > 0 else "兜底止损已关闭，用于所有客户端后续开仓和反手；已有持仓不变"))
 
     async def enable(self) -> TradingToggleResponse:
         status = await asyncio.to_thread(self.worker.get_status)
