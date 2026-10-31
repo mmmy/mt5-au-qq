@@ -264,34 +264,32 @@ if enablePrice20 and na(line20) and price20 > 0
     line20 := line.new(startTime, price20, openEndTime, price20, xloc.bar_time, color = p20Color, width = 2)
 
 bodyHight = math.abs(close - open)
-longBarPriceFilter = open + bodyHight * 0.33333
-shortBarPriceFilter = open - bodyHight * 0.33333
 isLongBar = close > open
-// 看涨k 记录实体上破2/3位置的价格,否则纪录下破2/3位置的价格
-priceFilter = isLongBar ? longBarPriceFilter : shortBarPriceFilter
+// 从开盘向收盘方向取实体1/3的位置，用于判断实体至少2/3越过价格线。
+priceFilter = isLongBar ? open + bodyHight / 3 : open - bodyHight / 3
 
-[isLongBar30_0, priceFilter30_0, isLongBar30_1, priceFilter30_1, timeClose30] = request.security('', '30', [isLongBar, priceFilter, isLongBar[1], priceFilter[1], time_close], lookahead = barmerge.lookahead_on)
-// 使用已经收盘的30分钟数据
-isLongBar30 = isLongBar30_1
-priceFilter30 = priceFilter30_1
+[priceFilter30, timeClose30] = request.security('', '30', [priceFilter, time_close], lookahead = barmerge.lookahead_off)
+// 2分钟K线确认收盘，且结束时间与30分钟K线相同时，才更新价格线。
+confirmed30 = barstate.isconfirmed and time_close == timeClose30
 
-// plot(priceFilter30, color = isLongBar30 ? color.green : color.red)
-
-// [isLongBar15_1, priceFilter15_1] = request.security('', '15', [isLongBar[1], priceFilter[1]], lookahead = barmerge.lookahead_on)
-// plot(priceFilter15_1, color = isLongBar15_1 ? color.green : color.red)
-// 定位到做多和做空的价格
-longPriceIndex = -1
-longPrice = 0.0
-shortPriceIndex = -1
-shortPrice = 0.0
-for [index, value] in prices
+// 保存上下方价格线，直到下一次30分钟收盘更新；有效期外清空。
+var int longPriceIndex = -1
+var float longPrice = 0.0
+var int shortPriceIndex = -1
+var float shortPrice = 0.0
+if confirmed30 or not timeFilter
+    longPriceIndex := -1
+    longPrice := 0.0
+    shortPriceIndex := -1
+    shortPrice := 0.0
     if timeFilter
-        if priceFilter30_1 >= value //and priceFilter15_1 >= value
-            longPriceIndex := index
-            longPrice := value
-        if shortPrice <= 0 and priceFilter30_1 <= value //and priceFilter15_1 <= value
-            shortPriceIndex := index
-            shortPrice := value
+        for [index, value] in prices
+            if priceFilter30 >= value
+                longPriceIndex := index
+                longPrice := value
+            if shortPrice <= 0 and priceFilter30 <= value
+                shortPriceIndex := index
+                shortPrice := value
 
 longPriceChanged = ta.change(longPrice) != 0
 shortPriceChanged = ta.change(shortPrice) != 0
