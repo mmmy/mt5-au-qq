@@ -368,8 +368,8 @@ slFractalBottom = fractalBottom and bsSlSellMatchPrice < 8
 bs_slFractalTop = ta.barssince(slFractalTop)
 bs_slFractalBottom = ta.barssince(slFractalBottom)
 
-// bgcolor(slFractalTop ? color.new(#d400a6, 60) : na)
-// bgcolor(slFractalBottom ? color.new(#55d400, 60) : na)
+bgcolor(slFractalTop ? color.new(#d400a6, 60) : na)
+bgcolor(slFractalBottom ? color.new(#55d400, 60) : na)
 
 bodyUpper = math.max(close, open)
 bodyLower = math.min(close, open)
@@ -410,16 +410,16 @@ isInShortPrice = not (high < shortPriceMin) and not (low > shortPriceMax) and sh
 [fractalTop_5m, fractalBottom_5m, pinbarUp_5m, pinbarDown_5m, pinbarMore_5m, bullishInsideBar_5m, bearishInsideBar_5m, tumoLong_5m, tumoShort_5m, isInLongPirce_5m, isInShortPrice_5m, timeClose_5m] = request.security(syminfo.tickerid, '5',
   [fractalTop[1], fractalBottom[1], pinbarUp[1], pinbarDown[1], pinbarMore[1], bullishInsideBar[1], bearishInsideBar[1], tumoLong[1], tumoShort[1], isInLongPirce[1], isInShortPrice[1], time_close], lookahead = barmerge.lookahead_on)
 
-[fractalTop_30m, fractalBottom_30m, pinbarUp_30m, pinbarDown_30m, pinbarMore_30m, bullishInsideBar_30m, bearishInsideBar_30m, tumoLong_30m, tumoShort_30m, isInLongPirce_30m, isInShortPrice_30m, timeClose_30m] = request.security(syminfo.tickerid, '30',
-  [fractalTop[1], fractalBottom[1], pinbarUp[1], pinbarDown[1], pinbarMore[1], bullishInsideBar[1], bearishInsideBar[1], tumoLong[1], tumoShort[1], isInLongPirce[1], isInShortPrice[1], time_close], lookahead = barmerge.lookahead_on)
+[fractalTop_30m, fractalBottom_30m, pinbarUp_30m, pinbarDown_30m, pinbarMore_30m, bullishInsideBar_30m, bearishInsideBar_30m, tumoLong_30m, tumoShort_30m, time_close_30] = request.security(syminfo.tickerid, '30',
+  [fractalTop, fractalBottom, pinbarUp, pinbarDown, pinbarMore, bullishInsideBar, bearishInsideBar, tumoLong, tumoShort, time_close], lookahead = barmerge.lookahead_on)
 
 long30_3k = fractalBottom_30m or bullishInsideBar_30m or tumoLong_30m
 long30_1k = pinbarUp_30m or pinbarMore_30m
 short30_3k = fractalTop_30m or bearishInsideBar_30m or tumoShort_30m
 short30_1k = pinbarDown_30m or pinbarMore_30m
 // 2m缩量+底分型 且被包含在30m的看涨形态中
-longSignal_1 = longSideOn and ((long30_3k and bs_slFractalBottom < 40) or (long30_1k and bs_slFractalBottom < 10))
-shortSignal_1 = shortSideOn and ((short30_3k and bs_slFractalTop < 40) or (short30_1k and bs_slFractalTop < 10))
+longSignal_1 = barstate.isconfirmed and longSideOn and time_close == time_close_30 and ((long30_3k and bs_slFractalBottom < 36) or (long30_1k and bs_slFractalBottom < 6))
+shortSignal_1 = barstate.isconfirmed and shortSideOn and time_close == time_close_30 and ((short30_3k and bs_slFractalTop < 36) or (short30_1k and bs_slFractalTop < 6))
 
 fractalBottomSignal = enableFractal and fractalBottom
 fractalTopSignal = enableFractal and fractalTop
