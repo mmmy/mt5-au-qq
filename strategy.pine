@@ -493,6 +493,10 @@ bsShort_5m = ta.barssince(short_5m)
 // 5分钟最近有缩量,且 5分钟和2分钟共振
 shortSignal = shortSideOn and bsSlBuyMatchPrice_5m < 10 and bsShort_5m <= 3 and short_2m
 
+// 新旧信号共用待开仓流程及每个价格的多空额度。
+entryLongSignal = longSignal or longSignal_1
+entryShortSignal = shortSignal or shortSignal_1
+
 // 与 barssince 使用同一个有效信号，保存最近一次5分钟信号的形态。
 var string lastLong5mMsg = na
 var string lastShort5mMsg = na
@@ -504,6 +508,10 @@ if short_5m
 // 收盘后的历史值与 longSignal[1] / shortSignal[1] 对应。
 longSignalMsg = longSignal ? str.format('{0}+{1}', lastLong5mMsg, longMsg2) : na
 shortSignalMsg = shortSignal ? str.format('{0}+{1}', lastShort5mMsg, shortMsg2) : na
+
+// 同时成立时沿用原信号消息；新信号的分型发生在此前，使用独立描述。
+entryLongSignalMsg = longSignal ? longSignalMsg : longSignal_1 ? '30m形态+2m缩量底分型' : na
+entryShortSignalMsg = shortSignal ? shortSignalMsg : shortSignal_1 ? '30m形态+2m缩量顶分型' : na
 
 bgcolor(color = (showSignal5m and longSideOn and long_5m) ? color.new(color.white, 80) : na, title = '5m long')
 bgcolor(color = (showSignal5m and shortSideOn and short_5m) ? color.new(color.orange, 80) : na, title = '5m short')
@@ -546,10 +554,10 @@ if hasLongPos or not canLongAtPrice
     longEntryMsg := na
 else
     // 2分钟信号刚收盘
-    if longSignal[1]
+    if entryLongSignal[1]
         if na(longEntryPrice)
             longEntryPrice := longPrice + entryDelta
-            longEntryMsg := longSignalMsg[1]
+            longEntryMsg := entryLongSignalMsg[1]
     // 支撑线发生了变化, 应该重置
     if longPriceChanged
         longEntryPrice := na
@@ -559,10 +567,10 @@ if hasShortPos or not canShortAtPrice
     shortEntryPrice := na
     shortEntryMsg := na
 else
-    if shortSignal[1]
+    if entryShortSignal[1]
         if na(shortEntryPrice)
             shortEntryPrice := shortPrice - entryDelta
-            shortEntryMsg := shortSignalMsg[1]
+            shortEntryMsg := entryShortSignalMsg[1]
     // 压力线发生了变化, 应该重置
     if shortPriceChanged
         shortEntryPrice := na
