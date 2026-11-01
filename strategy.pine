@@ -269,6 +269,7 @@ isLongBar = close > open
 priceFilter = isLongBar ? open + bodyHight / 3 : open - bodyHight / 3
 
 [priceFilter30, timeClose30] = request.security('', '30', [priceFilter, time_close], lookahead = barmerge.lookahead_off)
+[priceFilter4h_1] = request.security('', '240', [priceFilter[1]], lookahead = barmerge.lookahead_off)
 // 2分钟K线确认收盘，且结束时间与30分钟K线相同时，才更新价格线。
 confirmed30 = barstate.isconfirmed and time_close == timeClose30
 
@@ -414,6 +415,9 @@ isInShortPrice = not (high < shortPriceMin) and not (low > shortPriceMax) and sh
 [fractalTop_1h, fractalBottom_1h, pinbarUp_1h, pinbarDown_1h, pinbarMore_1h, bullishInsideBar_1h, bearishInsideBar_1h, tumoLong_1h, tumoShort_1h, time_close_1h] = request.security(syminfo.tickerid, '60',
   [fractalTop, fractalBottom, pinbarUp, pinbarDown, pinbarMore, bullishInsideBar, bearishInsideBar, tumoLong, tumoShort, time_close], lookahead = barmerge.lookahead_on)
 
+isClose_30 = time_close == time_close_30
+isClose_1h = time_close == time_close_1h
+
 long30_3k = fractalBottom_1h or bullishInsideBar_30m or tumoLong_30m
 long30_1k = pinbarUp_30m or pinbarMore_30m
 short30_3k = fractalTop_30m or bearishInsideBar_30m or tumoShort_30m
@@ -421,6 +425,21 @@ short30_1k = pinbarDown_30m or pinbarMore_30m
 // 2m缩量+底分型 且被包含在30m的看涨形态中
 longSignal_1 = barstate.isconfirmed and longSideOn and time_close == time_close_30 and ((long30_3k and bs_slFractalBottom < 36) or (long30_1k and bs_slFractalBottom < 6))
 shortSignal_1 = barstate.isconfirmed and shortSideOn and time_close == time_close_30 and ((short30_3k and bs_slFractalTop < 36) or (short30_1k and bs_slFractalTop < 6))
+
+long30 = fractalBottom_30m or pinbarUp_30m or pinbarMore_30m or bullishInsideBar_30m or tumoLong_30m
+long1h = fractalBottom_1h or pinbarUp_1h or pinbarMore_1h or bullishInsideBar_1h or tumoLong_1h
+short30 = fractalTop_30m or pinbarDown_30m or pinbarMore_30m or bearishInsideBar_30m or tumoShort_30m
+short1h = fractalTop_1h or pinbarDown_1h or pinbarMore_1h or bearishInsideBar_1h or tumoShort_1h
+// 30分钟和1h共振
+long_gz_30_1h = barstate.isconfirmed and isClose_30 and isClose_1h and long30 and long1h
+short_gz_30_1h = barstate.isconfirmed and isClose_30 and isClose_1h and short30 and short1h
+var gzpriceLong = 0.0
+var gzpriceShort = 0.0
+bs_long_gz_30_1h = ta.barssince(long_gz_30_1h)
+bs_short_gz_30_1h = ta.barssince(short_gz_30_1h)
+// 8小时内出现30和1h共振,且4小时确认站上看多的价格
+longSignalGz = bs_long_gz_30_1h <= 8 * 60 / 2 and priceFilter4h_1 >= longPrice
+// shortSignalGz = bs_short_gz_30_1h <= 8 * 60 / 2
 
 fractalBottomSignal = enableFractal and fractalBottom
 fractalTopSignal = enableFractal and fractalTop
