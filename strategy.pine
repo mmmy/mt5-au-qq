@@ -265,11 +265,14 @@ if enablePrice20 and na(line20) and price20 > 0
 
 bodyHight = math.abs(close - open)
 isLongBar = close > open
-// 从开盘向收盘方向取实体1/3的位置，用于判断实体至少2/3越过价格线。
-priceFilter = isLongBar ? open + bodyHight / 3 : open - bodyHight / 3
+// 与阴阳线方向无关：实体底部向上1/3 >= 看多价格，表示至少2/3实体在该价格上方。
+priceFilterLong = math.min(open, close) + bodyHight / 3
+// 实体顶部向下1/3 <= 看空价格，表示至少2/3实体在该价格下方。
+priceFilterShort = math.max(open, close) - bodyHight / 3
 
-[priceFilter30, timeClose30] = request.security('', '30', [priceFilter, time_close], lookahead = barmerge.lookahead_off)
-[priceFilter4h_1] = request.security('', '240', [priceFilter[1]], lookahead = barmerge.lookahead_off)
+[priceFilterLong30, priceFilterShort30, timeClose30] = request.security('', '30', [priceFilterLong, priceFilterShort, time_close], lookahead = barmerge.lookahead_off)
+// 上一根已收盘4小时K线；[1]配合lookahead_on，保持历史与实时的更新时机一致。
+[priceFilterLong4h_1] = request.security('', '240', [priceFilterLong[1]], lookahead = barmerge.lookahead_on)
 // 2分钟K线确认收盘，且结束时间与30分钟K线相同时，才更新价格线。
 confirmed30 = barstate.isconfirmed and time_close == timeClose30
 
@@ -285,10 +288,10 @@ if confirmed30 or not timeFilter
     shortPrice := 0.0
     if timeFilter
         for [index, value] in prices
-            if priceFilter30 >= value
+            if priceFilterLong30 >= value
                 longPriceIndex := index
                 longPrice := value
-            if shortPrice <= 0 and priceFilter30 <= value
+            if shortPrice <= 0 and priceFilterShort30 <= value
                 shortPriceIndex := index
                 shortPrice := value
 
@@ -437,8 +440,9 @@ var gzpriceLong = 0.0
 var gzpriceShort = 0.0
 bs_long_gz_30_1h = ta.barssince(long_gz_30_1h)
 bs_short_gz_30_1h = ta.barssince(short_gz_30_1h)
-// 8小时内出现30和1h共振,且4小时确认站上看多的价格
-longSignalGz = bs_long_gz_30_1h <= 8 * 60 / 2 and priceFilter4h_1 >= longPrice
+// 距最近一次30m和1h共振不超过240根2分钟K线（连续交易时为8小时，含边界）。
+// 上一根已收盘4小时K线至少2/3实体在当前有效看多价格上方，不要求确认晚于共振。
+longSignalGz = barstate.isconfirmed and longSideOn and longPrice > 0 and bs_long_gz_30_1h <= 8 * 60 / 2 and priceFilterLong4h_1 >= longPrice
 // shortSignalGz = bs_short_gz_30_1h <= 8 * 60 / 2
 
 fractalBottomSignal = enableFractal and fractalBottom
@@ -515,8 +519,8 @@ bsShort_5m = ta.barssince(short_5m)
 // 5分钟最近有缩量,且 5分钟和2分钟共振
 shortSignal = shortSideOn and bsSlBuyMatchPrice_5m < 10 and bsShort_5m <= 3 and short_2m
 
-// 新旧信号共用待开仓流程及每个价格的多空额度。
-entryLongSignal = longSignal or longSignal_1
+// 新旧信号共用待开仓流程及每个价格的多空额度。gz先屏蔽,有问题
+entryLongSignal = longSignal or longSignal_1// or longSignalGz
 entryShortSignal = shortSignal or shortSignal_1
 
 // 与 barssince 使用同一个有效信号，保存最近一次5分钟信号的形态。
@@ -531,8 +535,8 @@ if short_5m
 longSignalMsg = longSignal ? str.format('{0}+{1}', lastLong5mMsg, longMsg2) : na
 shortSignalMsg = shortSignal ? str.format('{0}+{1}', lastShort5mMsg, shortMsg2) : na
 
-// 同时成立时沿用原信号消息；新信号的分型发生在此前，使用独立描述。
-entryLongSignalMsg = longSignal ? longSignalMsg : longSignal_1 ? '30m形态+2m缩量底分型' : na
+// 多个信号同时成立时优先沿用原信号消息，各新增信号使用独立描述。
+entryLongSignalMsg = longSignal ? longSignalMsg : longSignal_1 ? '30m形态+2m缩量底分型' : longSignalGz ? '30m+1h共振及4h实体站上看多价格' : na
 entryShortSignalMsg = shortSignal ? shortSignalMsg : shortSignal_1 ? '30m形态+2m缩量顶分型' : na
 
 bgcolor(color = (showSignal5m and longSideOn and long_5m) ? color.new(color.white, 80) : na, title = '5m long')
