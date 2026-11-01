@@ -411,7 +411,10 @@ isInShortPrice = not (high < shortPriceMin) and not (low > shortPriceMax) and sh
 [fractalTop_30m, fractalBottom_30m, pinbarUp_30m, pinbarDown_30m, pinbarMore_30m, bullishInsideBar_30m, bearishInsideBar_30m, tumoLong_30m, tumoShort_30m, time_close_30] = request.security(syminfo.tickerid, '30',
   [fractalTop, fractalBottom, pinbarUp, pinbarDown, pinbarMore, bullishInsideBar, bearishInsideBar, tumoLong, tumoShort, time_close], lookahead = barmerge.lookahead_on)
 
-long30_3k = fractalBottom_30m or bullishInsideBar_30m or tumoLong_30m
+[fractalTop_1h, fractalBottom_1h, pinbarUp_1h, pinbarDown_1h, pinbarMore_1h, bullishInsideBar_1h, bearishInsideBar_1h, tumoLong_1h, tumoShort_1h, time_close_1h] = request.security(syminfo.tickerid, '60',
+  [fractalTop, fractalBottom, pinbarUp, pinbarDown, pinbarMore, bullishInsideBar, bearishInsideBar, tumoLong, tumoShort, time_close], lookahead = barmerge.lookahead_on)
+
+long30_3k = fractalBottom_1h or bullishInsideBar_30m or tumoLong_30m
 long30_1k = pinbarUp_30m or pinbarMore_30m
 short30_3k = fractalTop_30m or bearishInsideBar_30m or tumoShort_30m
 short30_1k = pinbarDown_30m or pinbarMore_30m
