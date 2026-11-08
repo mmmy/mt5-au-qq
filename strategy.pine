@@ -449,8 +449,13 @@ short_gz_15_30 = barstate.isconfirmed and isClose_15 and isClose_30 and short15 
 long_gz_15_1h = barstate.isconfirmed and isClose_15 and isClose_1h and long15 and long1h
 short_gz_15_1h = barstate.isconfirmed and isClose_15 and isClose_1h and short15 and short1h
 
-long_gz = long_gz_15_30 or long_gz_30_1h or long_gz_15_1h
-short_gz = short_gz_15_30 or short_gz_30_1h or short_gz_15_1h
+// 按最大周期分组，用于匹配此前的小周期入场信号。
+long_gz_30m = long_gz_15_30
+long_gz_1h = long_gz_15_1h or long_gz_30_1h
+// long_gz = long_gz_30m or long_gz_1h
+short_gz_30m = short_gz_15_30
+short_gz_1h = short_gz_15_1h or short_gz_30_1h
+// short_gz = short_gz_30m or short_gz_1h
 
 var gzpriceLong = 0.0
 var gzpriceShort = 0.0
@@ -535,9 +540,15 @@ bsShort_5m = ta.barssince(short_5m)
 // 5分钟最近有缩量,且 5分钟和2分钟共振
 shortSignal = shortSideOn and bsSlBuyMatchPrice_5m < 10 and bsShort_5m <= 3 and short_2m
 
-// 新旧信号共用待开仓流程及每个价格的多空额度。gz先屏蔽,有问题
-entryLongSignal = longSignal or longSignal_1// or longSignalGz
-entryShortSignal = shortSignal or shortSignal_1
+// 共振收盘确认时回看原入场信号；两组分别按最大周期的3根K线取范围，含边界。
+gz30LookbackBars = 45 // 多空共用；45根2分钟K线，连续交易时为90分钟。
+gz1hLookbackBars = 90 // 多空共用；90根2分钟K线，连续交易时为3小时。
+rawEntryLongSignal = barstate.isconfirmed and (longSignal or longSignal_1)
+bsRawEntryLongSignal = ta.barssince(rawEntryLongSignal)
+entryLongSignal = (long_gz_30m and bsRawEntryLongSignal <= gz30LookbackBars) or (long_gz_1h and bsRawEntryLongSignal <= gz1hLookbackBars)
+rawEntryShortSignal = barstate.isconfirmed and (shortSignal or shortSignal_1)
+bsRawEntryShortSignal = ta.barssince(rawEntryShortSignal)
+entryShortSignal = (short_gz_30m and bsRawEntryShortSignal <= gz30LookbackBars) or (short_gz_1h and bsRawEntryShortSignal <= gz1hLookbackBars)
 
 // 与 barssince 使用同一个有效信号，保存最近一次5分钟信号的形态。
 var string lastLong5mMsg = na
@@ -551,9 +562,17 @@ if short_5m
 longSignalMsg = longSignal ? str.format('{0}+{1}', lastLong5mMsg, longMsg2) : na
 shortSignalMsg = shortSignal ? str.format('{0}+{1}', lastShort5mMsg, shortMsg2) : na
 
-// 多个信号同时成立时优先沿用原信号消息，各新增信号使用独立描述。
-entryLongSignalMsg = longSignal ? longSignalMsg : longSignal_1 ? '30m形态+2m缩量底分型' : longSignalGz ? '30m+1h共振及4h实体站上看多价格' : na
-entryShortSignalMsg = shortSignal ? shortSignalMsg : shortSignal_1 ? '30m形态+2m缩量顶分型' : na
+// 保存最近一次已收盘候选信号的说明，供后续共振确认时使用。
+rawEntryLongSignalMsg = longSignal ? longSignalMsg : longSignal_1 ? '30m形态+2m缩量底分型' : na
+var string lastRawEntryLongSignalMsg = na
+if rawEntryLongSignal
+    lastRawEntryLongSignalMsg := rawEntryLongSignalMsg
+entryLongSignalMsg = entryLongSignal ? lastRawEntryLongSignalMsg : na
+rawEntryShortSignalMsg = shortSignal ? shortSignalMsg : shortSignal_1 ? '30m形态+2m缩量顶分型' : na
+var string lastRawEntryShortSignalMsg = na
+if rawEntryShortSignal
+    lastRawEntryShortSignalMsg := rawEntryShortSignalMsg
+entryShortSignalMsg = entryShortSignal ? lastRawEntryShortSignalMsg : na
 
 bgcolor(color = (showSignal5m and longSideOn and long_5m) ? color.new(color.white, 80) : na, title = '5m long')
 bgcolor(color = (showSignal5m and shortSideOn and short_5m) ? color.new(color.orange, 80) : na, title = '5m short')
