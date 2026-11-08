@@ -412,6 +412,9 @@ isInShortPrice = not (high < shortPriceMin) and not (low > shortPriceMax) and sh
 [fractalTop_5m, fractalBottom_5m, pinbarUp_5m, pinbarDown_5m, pinbarMore_5m, bullishInsideBar_5m, bearishInsideBar_5m, tumoLong_5m, tumoShort_5m, isInLongPirce_5m, isInShortPrice_5m, timeClose_5m] = request.security(syminfo.tickerid, '5',
   [fractalTop[1], fractalBottom[1], pinbarUp[1], pinbarDown[1], pinbarMore[1], bullishInsideBar[1], bearishInsideBar[1], tumoLong[1], tumoShort[1], isInLongPirce[1], isInShortPrice[1], time_close], lookahead = barmerge.lookahead_on)
 
+[fractalTop_15m, fractalBottom_15m, pinbarUp_15m, pinbarDown_15m, pinbarMore_15m, bullishInsideBar_15m, bearishInsideBar_15m, tumoLong_15m, tumoShort_15m, time_close_15] = request.security(syminfo.tickerid, '15',
+  [fractalTop, fractalBottom, pinbarUp, pinbarDown, pinbarMore, bullishInsideBar, bearishInsideBar, tumoLong, tumoShort, time_close], lookahead = barmerge.lookahead_on)
+
 [fractalTop_30m, fractalBottom_30m, pinbarUp_30m, pinbarDown_30m, pinbarMore_30m, bullishInsideBar_30m, bearishInsideBar_30m, tumoLong_30m, tumoShort_30m, time_close_30] = request.security(syminfo.tickerid, '30',
   [fractalTop, fractalBottom, pinbarUp, pinbarDown, pinbarMore, bullishInsideBar, bearishInsideBar, tumoLong, tumoShort, time_close], lookahead = barmerge.lookahead_on)
 
