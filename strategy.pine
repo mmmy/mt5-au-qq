@@ -272,7 +272,7 @@ priceFilterShort = math.max(open, close) - bodyHight / 3
 
 [priceFilterLong30, priceFilterShort30, timeClose30] = request.security('', '30', [priceFilterLong, priceFilterShort, time_close], lookahead = barmerge.lookahead_off)
 // 上一根已收盘4小时K线；[1]配合lookahead_on，保持历史与实时的更新时机一致。
-[priceFilterLong4h_1] = request.security('', '240', [priceFilterLong[1]], lookahead = barmerge.lookahead_on)
+[priceFilterLong4h_1, priceFilterShort4h_1] = request.security('', '240', [priceFilterLong[1], priceFilterShort[1]], lookahead = barmerge.lookahead_on)
 // 2分钟K线确认收盘，且结束时间与30分钟K线相同时，才更新价格线。
 confirmed30 = barstate.isconfirmed and time_close == timeClose30
 
@@ -461,10 +461,10 @@ var gzpriceLong = 0.0
 var gzpriceShort = 0.0
 bs_long_gz_30_1h = ta.barssince(long_gz_30_1h)
 bs_short_gz_30_1h = ta.barssince(short_gz_30_1h)
-// 距最近一次30m和1h共振不超过240根2分钟K线（连续交易时为8小时，含边界）。
+
 // 上一根已收盘4小时K线至少2/3实体在当前有效看多价格上方，不要求确认晚于共振。
-longSignalGz = barstate.isconfirmed and longSideOn and longPrice > 0 and bs_long_gz_30_1h <= 8 * 60 / 2 and priceFilterLong4h_1 >= longPrice
-// shortSignalGz = bs_short_gz_30_1h <= 8 * 60 / 2
+longSignalGz = barstate.isconfirmed and longSideOn and longPrice > 0 and bs_long_gz_30_1h <= 8 * 60 / 2 and priceFilterLong4h_1 >= longPrice and low[bs_long_gz_30_1h] < longPrice
+shortSignalGz = barstate.isconfirmed and shortSideOn and shortPrice > 0 and bs_short_gz_30_1h <= 8 * 60 / 2 and priceFilterShort4h_1 <= shortPrice and high[bs_short_gz_30_1h] > shortPrice
 
 fractalBottomSignal = enableFractal and fractalBottom
 fractalTopSignal = enableFractal and fractalTop
