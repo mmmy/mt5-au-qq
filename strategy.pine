@@ -264,7 +264,6 @@ if enablePrice20 and na(line20) and price20 > 0
     line20 := line.new(startTime, price20, openEndTime, price20, xloc.bar_time, color = p20Color, width = 2)
 
 bodyHight = math.abs(close - open)
-isLongBar = close > open
 // 与阴阳线方向无关：实体底部向上1/3 >= 看多价格，表示至少2/3实体在该价格上方。
 priceFilterLong = math.min(open, close) + bodyHight / 3
 // 实体顶部向下1/3 <= 看空价格，表示至少2/3实体在该价格下方。
@@ -320,21 +319,14 @@ sp1 = plot(shortPriceMin, display = display.none)
 sp2 = plot(shortPriceMax, display = display.none)
 fill(sp1, sp2, color=color.new(color.red, 80))
 
-// 缩量
-sl = bodyHight < bodyHight[1] and bodyHight[1] < bodyHight[2]
-slSell = not isLongBar and not isLongBar[1] and not isLongBar[2] and sl
-slBuy = isLongBar and isLongBar[1] and isLongBar[2] and sl
-
-//缩量在关键价格上
-slSellMatchPrice = slSell and open < longPrice
-slBuyMatchPrice = slBuy and open > shortPrice
-bsSlSellMatchPrice = ta.barssince(slSellMatchPrice)
-bsSlBuyMatchPrice = ta.barssince(slBuyMatchPrice)
+// 单根 K 线实体穿过关键价格
+crossBelowSupport = open > longPrice and close < longPrice
+crossAboveResistance = open < shortPrice and close > shortPrice
+bsCrossBelowSupport = ta.barssince(crossBelowSupport)
+bsCrossAboveResistance = ta.barssince(crossAboveResistance)
 
 // [1] 取上一根已收盘5分钟K线的值；配合 lookahead_on，避免当前未收盘数据重绘和历史前视。
-[slSellMatchPrice_5m, slBuyMatchPrice_5m, bsSlSellMatchPrice_5m, bsSlBuyMatchPrice_5m] = request.security(syminfo.tickerid, '5', [slSellMatchPrice, slBuyMatchPrice, bsSlSellMatchPrice[1], bsSlBuyMatchPrice[1]], lookahead = barmerge.lookahead_on)
-// bgcolor(slSellMatchPrice_5m ? color.new(color.white, 70) : na)
-// bgcolor(slBuyMatchPrice_5m ? color.new(color.blue, 70) : na)
+[bsCrossBelowSupport_5m, bsCrossAboveResistance_5m] = request.security(syminfo.tickerid, '5', [bsCrossBelowSupport[1], bsCrossAboveResistance[1]], lookahead = barmerge.lookahead_on)
 
 // plot(longPrice > 0 ? longPrice : na, color=color.green)
 // plot(shortPrice > 0 ? shortPrice : na, color=color.red)
@@ -364,14 +356,14 @@ fractalTop = high[1] > high[2] and low[1] > low[2] and high < high[1] and low < 
 fractalBottom = high[1] < high[2] and low[1] < low[2] and high > high[1] and low > low[1] and close > open[2] and upBar and close[1] < open[2] //and downBar[2]
 bgcolor(showFractal and fractalTop ? color.new(color.red, 70) : na)
 bgcolor(showFractal and fractalBottom ? color.new(color.green, 70) : na)
-//缩量后面出现顶/底分型
-slFractalTop = fractalTop and bsSlBuyMatchPrice < 8
-slFractalBottom = fractalBottom and bsSlSellMatchPrice < 8
-bs_slFractalTop = ta.barssince(slFractalTop)
-bs_slFractalBottom = ta.barssince(slFractalBottom)
+// 穿过关键价格后出现顶/底分型
+crossFractalTop = fractalTop and bsCrossAboveResistance < 3
+crossFractalBottom = fractalBottom and bsCrossBelowSupport < 3
+bsCrossFractalTop = ta.barssince(crossFractalTop)
+bsCrossFractalBottom = ta.barssince(crossFractalBottom)
 
-bgcolor(slFractalTop ? color.new(#d400a6, 60) : na)
-bgcolor(slFractalBottom ? color.new(#55d400, 60) : na)
+bgcolor(crossFractalTop ? color.new(#d400a6, 60) : na)
+bgcolor(crossFractalBottom ? color.new(#55d400, 60) : na)
 
 bodyUpper = math.max(close, open)
 bodyLower = math.min(close, open)
@@ -429,9 +421,9 @@ long30_3k = fractalBottom_1h or bullishInsideBar_30m or tumoLong_30m
 long30_1k = pinbarUp_30m or pinbarMore_30m
 short30_3k = fractalTop_30m or bearishInsideBar_30m or tumoShort_30m
 short30_1k = pinbarDown_30m or pinbarMore_30m
-// 2m缩量+底分型 且被包含在30m的看涨形态中
-longSignal_1 = barstate.isconfirmed and longSideOn and time_close == time_close_30 and ((long30_3k and bs_slFractalBottom < 36) or (long30_1k and bs_slFractalBottom < 6))
-shortSignal_1 = barstate.isconfirmed and shortSideOn and time_close == time_close_30 and ((short30_3k and bs_slFractalTop < 36) or (short30_1k and bs_slFractalTop < 6))
+// 30m 形态收盘时回看 2m 穿价后的顶/底分型
+longSignal_1 = barstate.isconfirmed and longSideOn and time_close == time_close_30 and ((long30_3k and bsCrossFractalBottom < 36) or (long30_1k and bsCrossFractalBottom < 6))
+shortSignal_1 = barstate.isconfirmed and shortSideOn and time_close == time_close_30 and ((short30_3k and bsCrossFractalTop < 36) or (short30_1k and bsCrossFractalTop < 6))
 
 long15 = fractalBottom_15m or pinbarUp_15m or pinbarMore_15m or bullishInsideBar_15m or tumoLong_15m
 long30 = fractalBottom_30m or pinbarUp_30m or pinbarMore_30m or bullishInsideBar_30m or tumoLong_30m
@@ -531,14 +523,14 @@ else if enableTunmo and tumoShort
 long_5m = isInLongPirce_5m and ((enableFractal_5m and fractalBottom_5m) or (enablePinbar_5m and pinbarUp_5m) or (enablePinbarMore_5m and pinbarMore_5m) or (enableInsideBar_5m and bullishInsideBar_5m) or (enableTunmo_5m and tumoLong_5m))
 bsLong_5m = ta.barssince(long_5m)
 long_2m = isInLongPirce and (fractalBottomSignal or pinbarUpSignal or pinbarMoreSignal or bullishInsideBarSignal or tumoLongSignal)
-// 5分钟最近有缩量,且 5分钟和2分钟共振
-longSignal = longSideOn and bsSlSellMatchPrice_5m < 10 and bsLong_5m <= 3 and long_2m
+// 5分钟最近跌穿支撑，且 5分钟和2分钟共振
+longSignal = longSideOn and bsCrossBelowSupport_5m < 5 and bsLong_5m <= 3 and long_2m
 
 short_5m = isInShortPrice_5m and ((enableFractal_5m and fractalTop_5m) or (enablePinbar_5m and pinbarDown_5m) or (enablePinbarMore_5m and pinbarMore_5m) or (enableInsideBar_5m and bearishInsideBar_5m) or (enableTunmo_5m and tumoShort_5m))
 short_2m = isInShortPrice and (fractalTopSignal or pinbarDownSignal or pinbarMoreSignal or bearishInsideBarSignal or tumoShortSignal)
 bsShort_5m = ta.barssince(short_5m)
-// 5分钟最近有缩量,且 5分钟和2分钟共振
-shortSignal = shortSideOn and bsSlBuyMatchPrice_5m < 10 and bsShort_5m <= 3 and short_2m
+// 5分钟最近涨穿阻力，且 5分钟和2分钟共振
+shortSignal = shortSideOn and bsCrossAboveResistance_5m < 5 and bsShort_5m <= 3 and short_2m
 
 // 共振收盘确认时回看原入场信号；两组分别按最大周期的3根K线取范围，含边界。
 // longSignalGz / shortSignalGz 作为额外入场条件，直接进入后续价格触发流程。
@@ -564,12 +556,12 @@ longSignalMsg = longSignal ? str.format('{0}+{1}', lastLong5mMsg, longMsg2) : na
 shortSignalMsg = shortSignal ? str.format('{0}+{1}', lastShort5mMsg, shortMsg2) : na
 
 // 保存最近一次已收盘候选信号的说明；新增共振条件成立时优先使用其专属说明。
-rawEntryLongSignalMsg = longSignal ? longSignalMsg : longSignal_1 ? '30m形态+2m缩量底分型' : na
+rawEntryLongSignalMsg = longSignal ? longSignalMsg : longSignal_1 ? '30m形态+2m跌穿支撑后底分型' : na
 var string lastRawEntryLongSignalMsg = na
 if rawEntryLongSignal
     lastRawEntryLongSignalMsg := rawEntryLongSignalMsg
 entryLongSignalMsg = entryLongSignal ? (longSignalGz ? '30m+1h多头共振+4h站上价格线' : lastRawEntryLongSignalMsg) : na
-rawEntryShortSignalMsg = shortSignal ? shortSignalMsg : shortSignal_1 ? '30m形态+2m缩量顶分型' : na
+rawEntryShortSignalMsg = shortSignal ? shortSignalMsg : shortSignal_1 ? '30m形态+2m涨穿阻力后顶分型' : na
 var string lastRawEntryShortSignalMsg = na
 if rawEntryShortSignal
     lastRawEntryShortSignalMsg := rawEntryShortSignalMsg
